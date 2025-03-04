@@ -168,3 +168,6 @@ app.*.map.json
 
 
 /.firebase
+
+
+android/app/src/main/AndroidManifest.xml
