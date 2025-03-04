@@ -320,23 +320,15 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Assigned Equipment Kits',
-                                style: Theme.of(context).textTheme.titleLarge,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              onPressed: _assignKit,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Assign Kit'),
-                            ),
-                          ],
+                        Text(
+                          'Assigned Equipment Kits',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: _assignKit,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Assign Kit'),
                         ),
                       ],
                     ),
