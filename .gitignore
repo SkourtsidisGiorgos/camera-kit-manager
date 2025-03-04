@@ -64,6 +64,7 @@ lib/generated_plugin_registrant.dart
 **/android/local.properties
 **/android/**/GeneratedPluginRegistrant.*
 **/android/key.properties
+./android/app/.cxx/
 *.jks
 
 # Keys
@@ -167,4 +168,3 @@ app.*.map.json
 
 
 /.firebase
-.firebase/

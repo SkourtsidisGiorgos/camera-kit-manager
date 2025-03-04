@@ -10,7 +10,6 @@ import '../data/rental_repository.dart';
 import '../data/repository.dart';
 import '../utils/constants.dart';
 import 'add_rental_screen.dart';
-import 'kit_list_screen.dart';
 import 'item_list_screen.dart';
 
 class RentalDetailsScreen extends StatefulWidget {

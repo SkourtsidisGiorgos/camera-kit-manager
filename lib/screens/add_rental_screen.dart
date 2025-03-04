@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:geocoding/geocoding.dart';
 import '../models/rental.dart';
 import '../data/rental_repository.dart';
-import '../utils/image_helper.dart';
 import 'location_picker_screen.dart';
 
 class AddRentalScreen extends StatefulWidget {

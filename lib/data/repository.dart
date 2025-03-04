@@ -60,10 +60,18 @@ class DataRepository {
   // Equipment Categories
   Future<void> initDefaultCategoriesIfEmpty() async {
     final box = Hive.box<EquipmentCategory>('equipmentCategories');
-    if (box.isEmpty) {
-      for (var category in EquipmentCategories.defaultCategories) {
-        await box.put(category.id, category);
-      }
+
+    // Always reset to ensure all categories are available
+    await box.clear();
+
+    // Add each default category with a consistent ID
+    for (var category in EquipmentCategories.defaultCategories) {
+      final newCategory = EquipmentCategory(
+        id: 'default_${category.name.replaceAll(' ', '_').toLowerCase()}',
+        name: category.name,
+        predefinedItems: category.predefinedItems,
+      );
+      await box.put(newCategory.id, newCategory);
     }
   }
 
@@ -80,5 +88,11 @@ class DataRepository {
   Future<void> deleteCategory(String id) async {
     final box = Hive.box<EquipmentCategory>('equipmentCategories');
     await box.delete(id);
+  }
+
+  // Force reset and get categories (use this for debugging)
+  Future<List<EquipmentCategory>> resetAndGetAllCategories() async {
+    await initDefaultCategoriesIfEmpty();
+    return getAllCategories();
   }
 }
