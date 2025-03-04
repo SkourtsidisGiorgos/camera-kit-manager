@@ -5,13 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/rental_item.dart';
-import '../data/repository.dart';
+import '../data/item_repository.dart';
 
 class ImageHelper {
   final ImagePicker _imagePicker = ImagePicker();
-  final DataRepository _repository = DataRepository();
+  final ItemRepository _repository = ItemRepository();
 
-  // Take a picture for an item
   Future<void> takeItemPicture(RentalItem item, bool isKitOpen) async {
     if (!isKitOpen) {
       throw Exception('Cannot modify items in a closed kit');
@@ -24,7 +23,6 @@ class ImageHelper {
     }
   }
 
-  // Add this new method to pick an image
   Future<XFile?> pickImage({
     required ImageSource source,
     double? maxWidth,

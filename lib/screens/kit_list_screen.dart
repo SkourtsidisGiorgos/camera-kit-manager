@@ -1,8 +1,10 @@
+import 'package:camera_kit_manager/data/kit_repository.dart';
 import 'package:camera_kit_manager/screens/item_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/kit.dart';
-import '../data/repository.dart';
+import '../models/rental.dart';
+import '../data/rental_repository.dart';
 import '../utils/constants.dart';
 
 class KitListScreen extends StatefulWidget {
@@ -15,8 +17,11 @@ class KitListScreen extends StatefulWidget {
 class _KitListScreenState extends State<KitListScreen> {
   final _formKey = GlobalKey<FormState>();
   final _kitNameController = TextEditingController();
-  final _repository = DataRepository();
+  final _kitRepository = KitRepository();
+  final _rentalRepository = RentalRepository();
   List<Kit> _kits = [];
+  List<Rental> _rentals = [];
+  Rental? _selectedRental;
   bool _isLoading = true;
 
   @override
@@ -33,10 +38,17 @@ class _KitListScreenState extends State<KitListScreen> {
 
   Future<void> _refreshKits() async {
     setState(() => _isLoading = true);
-    final kits = await _repository.getAllKits();
+    final kits = await _kitRepository.getAllKits();
     setState(() {
       _kits = kits..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
       _isLoading = false;
+    });
+  }
+
+  Future<void> _loadRentals() async {
+    final rentals = await _rentalRepository.getAllRentals();
+    setState(() {
+      _rentals = rentals..sort((a, b) => b.startDate.compareTo(a.startDate));
     });
   }
 
@@ -48,7 +60,13 @@ class _KitListScreenState extends State<KitListScreen> {
         isOpen: true,
       );
 
-      await _repository.saveKit(newKit);
+      await _kitRepository.saveKit(newKit);
+
+      // Associate kit with the selected rental if any
+      if (_selectedRental != null) {
+        await _rentalRepository.addKitToRental(_selectedRental!.id, newKit.id);
+      }
+
       _kitNameController.clear();
       Navigator.of(context).pop();
       _refreshKits();
@@ -63,41 +81,93 @@ class _KitListScreenState extends State<KitListScreen> {
       isOpen: !kit.isOpen,
     );
 
-    await _repository.updateKit(updatedKit);
+    await _kitRepository.updateKit(updatedKit);
     _refreshKits();
   }
 
-  void _showAddKitDialog() {
+  void _showAddKitDialog() async {
+    // Reset selection state
+    _selectedRental = null;
+    _kitNameController.clear();
+
+    // Load available rentals
+    await _loadRentals();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.newKit),
-        content: Form(
-          key: _formKey,
-          child: TextFormField(
-            controller: _kitNameController,
-            decoration: const InputDecoration(
-              labelText: AppStrings.kitName,
-              hintText: AppStrings.kitNameHint,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text(AppStrings.newKit),
+            content: SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _kitNameController,
+                      decoration: const InputDecoration(
+                        labelText: AppStrings.kitName,
+                        hintText: AppStrings.kitNameHint,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return AppStrings.kitNameValidator;
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Rental dropdown (optional)
+                    if (_rentals.isNotEmpty) ...[
+                      const Text(
+                        'Assign to Rental (Optional)',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButton<Rental>(
+                        isExpanded: true,
+                        hint: const Text('Select a rental (optional)'),
+                        value: _selectedRental,
+                        items: [
+                          // Add a "None" option
+                          const DropdownMenuItem<Rental>(
+                            value: null,
+                            child: Text('None'),
+                          ),
+                          ..._rentals.map((rental) {
+                            return DropdownMenuItem<Rental>(
+                              value: rental,
+                              child: Text(rental.name),
+                            );
+                          }),
+                        ],
+                        onChanged: (Rental? rental) {
+                          setState(() {
+                            _selectedRental = rental;
+                          });
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return AppStrings.kitNameValidator;
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(AppStrings.cancel),
-          ),
-          ElevatedButton(
-            onPressed: _addKit,
-            child: const Text(AppStrings.create),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(AppStrings.cancel),
+              ),
+              ElevatedButton(
+                onPressed: _addKit,
+                child: const Text(AppStrings.create),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -148,7 +218,7 @@ class _KitListScreenState extends State<KitListScreen> {
         isOpen: kit.isOpen,
       );
 
-      await _repository.updateKit(updatedKit);
+      await _kitRepository.updateKit(updatedKit);
       _kitNameController.clear();
       Navigator.of(context).pop();
       _refreshKits();
@@ -241,7 +311,7 @@ class _KitListScreenState extends State<KitListScreen> {
                                 );
 
                                 if (confirm ?? false) {
-                                  await _repository.deleteKit(kit.id);
+                                  await _kitRepository.deleteKit(kit.id);
                                   _refreshKits();
                                 }
                               },

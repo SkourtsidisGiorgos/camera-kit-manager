@@ -1,5 +1,6 @@
 // Create a new file: lib/screens/rental_details_screen.dart
 import 'dart:io';
+import 'package:camera_kit_manager/data/kit_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
@@ -7,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/rental.dart';
 import '../models/kit.dart';
 import '../data/rental_repository.dart';
-import '../data/repository.dart';
+import '../data/item_repository.dart';
 import '../utils/constants.dart';
 import 'add_rental_screen.dart';
 import 'item_list_screen.dart';
@@ -26,7 +27,8 @@ class RentalDetailsScreen extends StatefulWidget {
 
 class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
   final _rentalRepository = RentalRepository();
-  final _kitRepository = DataRepository();
+  final _kitRepository = KitRepository();
+  final _itemRepository = ItemRepository();
   List<Kit> _kits = [];
   List<Kit> _assignedKits = [];
   bool _isLoading = true;
@@ -51,7 +53,7 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
     // Calculate total cost
     double total = 0.0;
     for (var kit in assignedKits) {
-      final items = await _kitRepository.getRentalItemsByKitId(kit.id);
+      final items = await _itemRepository.getRentalItemsByKitId(kit.id);
       for (var item in items) {
         if (item.cost != null) {
           total += item.cost!;
@@ -313,25 +315,32 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
                     ),
                   ),
 
-                  // Assigned kits section
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Assigned Equipment Kits',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _assignKit,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Assign Kit'),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Assigned Equipment Kits',
+                                style: Theme.of(context).textTheme.titleLarge,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: _assignKit,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Assign Kit'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-
                   if (_assignedKits.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(16),

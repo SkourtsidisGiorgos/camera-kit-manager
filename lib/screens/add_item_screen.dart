@@ -1,12 +1,13 @@
 import 'dart:io';
 
+import 'package:camera_kit_manager/data/category_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/rental_item.dart';
 import '../models/equipment_category.dart';
-import '../data/repository.dart';
+import '../data/item_repository.dart';
 import '../utils/constants.dart';
 import '../utils/image_helper.dart';
 
@@ -29,7 +30,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _itemNameController = TextEditingController();
   final _notesController = TextEditingController();
   final _costController = TextEditingController(); // Added cost controller
-  final _repository = DataRepository();
+  final _item_repository = ItemRepository();
+  final _category_repository = CategoryRepository();
   final _imageHelper = ImageHelper(); // Added ImageHelper
 
   List<EquipmentCategory> _categories = [];
@@ -72,17 +74,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
 
-    // Initialize default categories if this is first run
-    await _repository.initDefaultCategoriesIfEmpty();
-
-    // Get all categories
-    final categories = await _repository.getAllCategories();
+    await _category_repository.initDefaultCategoriesIfEmpty();
+    final categories = await _category_repository.getAllCategories();
 
     setState(() {
       _categories = categories;
       _isLoading = false;
 
-      // If there's an existing item with a category, select it
       if (widget.existingItem?.category != null) {
         _onCategoryChanged(widget.existingItem!.category!);
       }
@@ -138,7 +136,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
         });
       }
     } catch (e) {
-      // Show error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error taking picture: ${e.toString()}')),
       );
@@ -188,9 +185,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
           cost: item.cost,
         );
 
-        await _repository.saveRentalItem(updatedItem);
+        await _item_repository.saveRentalItem(updatedItem);
       } else {
-        await _repository.saveRentalItem(item);
+        await _item_repository.saveRentalItem(item);
       }
 
       Navigator.of(context).pop();

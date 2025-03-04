@@ -1,3 +1,4 @@
+import 'package:camera_kit_manager/data/category_repository.dart';
 import 'package:camera_kit_manager/screens/add_item_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -7,7 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import '../models/kit.dart';
 import '../models/rental_item.dart';
-import '../data/repository.dart';
+import '../data/item_repository.dart';
 import '../utils/constants.dart';
 import '../utils/image_helper.dart';
 
@@ -21,7 +22,7 @@ class ItemListScreen extends StatefulWidget {
 }
 
 class _ItemListScreenState extends State<ItemListScreen> {
-  final _repository = DataRepository();
+  final _itemRepository = ItemRepository();
   final _imageHelper = ImageHelper();
   List<RentalItem> _items = [];
   bool _isLoading = true;
@@ -34,7 +35,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
 
   Future<void> _refreshItems() async {
     setState(() => _isLoading = true);
-    final items = await _repository.getRentalItemsByKitId(widget.kit.id);
+    final items = await _itemRepository.getRentalItemsByKitId(widget.kit.id);
     setState(() {
       _items = items..sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
       _isLoading = false;
@@ -246,7 +247,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
                                                     );
 
                                                     if (confirm ?? false) {
-                                                      await _repository
+                                                      await _itemRepository
                                                           .deleteRentalItem(
                                                               item.id);
                                                       _refreshItems();
