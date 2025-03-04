@@ -28,6 +28,9 @@ class RentalItem {
   @HiveField(7)
   final String? notes; // Added notes field
 
+  @HiveField(8)
+  final double? cost; // Added cost field
+
   RentalItem({
     String? id,
     required this.kitId,
@@ -37,6 +40,7 @@ class RentalItem {
     this.imageDataUrl,
     this.category,
     this.notes,
+    this.cost,
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
   Map<String, dynamic> toMap() {
@@ -49,6 +53,7 @@ class RentalItem {
       'imageDataUrl': imageDataUrl,
       'category': category,
       'notes': notes,
+      'cost': cost,
     };
   }
 }

@@ -1,3 +1,4 @@
+// Update the ImageHelper class in image_helper.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -23,6 +24,21 @@ class ImageHelper {
     }
   }
 
+  // Add this new method to pick an image
+  Future<XFile?> pickImage({
+    required ImageSource source,
+    double? maxWidth,
+    double? maxHeight,
+    int? imageQuality,
+  }) async {
+    return _imagePicker.pickImage(
+      source: source,
+      maxWidth: maxWidth ?? 1200,
+      maxHeight: maxHeight ?? 1200,
+      imageQuality: imageQuality ?? 85,
+    );
+  }
+
   // Handle image capture for web platform
   Future<void> _handleWebPicture(RentalItem item) async {
     final XFile? image = await _imagePicker.pickImage(
@@ -42,6 +58,7 @@ class ImageHelper {
         dateAdded: item.dateAdded,
         category: item.category,
         notes: item.notes,
+        cost: item.cost,
         imageDataUrl:
             'https://example.com/placeholder.jpg', // In a real app, convert to base64
       );
@@ -75,6 +92,7 @@ class ImageHelper {
         dateAdded: item.dateAdded,
         category: item.category,
         notes: item.notes,
+        cost: item.cost,
         imagePath: savedImage.path,
       );
 

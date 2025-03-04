@@ -102,6 +102,59 @@ class _KitListScreenState extends State<KitListScreen> {
     );
   }
 
+  void _showEditKitDialog(Kit kit) {
+    _kitNameController.text = kit.name;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Kit'),
+        content: Form(
+          key: _formKey,
+          child: TextFormField(
+            controller: _kitNameController,
+            decoration: const InputDecoration(
+              labelText: AppStrings.kitName,
+              hintText: AppStrings.kitNameHint,
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return AppStrings.kitNameValidator;
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(AppStrings.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => _updateKit(kit),
+            child: const Text(AppStrings.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateKit(Kit kit) async {
+    if (_formKey.currentState?.validate() ?? false) {
+      final updatedKit = Kit(
+        id: kit.id,
+        name: _kitNameController.text,
+        dateCreated: kit.dateCreated,
+        isOpen: kit.isOpen,
+      );
+
+      await _repository.updateKit(updatedKit);
+      _kitNameController.clear();
+      Navigator.of(context).pop();
+      _refreshKits();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,6 +196,11 @@ class _KitListScreenState extends State<KitListScreen> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showEditKitDialog(kit),
+                              tooltip: 'Edit Kit',
+                            ),
                             IconButton(
                               icon: Icon(
                                 kit.isOpen ? Icons.lock : Icons.lock_open,

@@ -160,125 +160,147 @@ class _ItemListScreenState extends State<ItemListScreen> {
                               DateFormat('MMM d, yyyy').format(item.dateAdded);
 
                           return Card(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ListTile(
-                                  title: Text(item.name),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Added: $formattedDate'),
-                                      if (item.category != null)
-                                        Text('Category: ${item.category}'),
-                                      if (item.notes != null &&
-                                          item.notes!.isNotEmpty)
-                                        Text('Notes: ${item.notes}'),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.camera_alt),
-                                        onPressed: () => _takePicture(item),
-                                        tooltip: AppStrings.takePhoto,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete,
-                                            color: Colors.grey),
-                                        onPressed: widget.kit.isOpen
-                                            ? () async {
-                                                final confirm =
-                                                    await showDialog<bool>(
-                                                  context: context,
-                                                  builder: (context) =>
-                                                      AlertDialog(
-                                                    title: const Text(
-                                                        AppStrings.deleteItem),
-                                                    content: Text(
-                                                        'Are you sure you want to delete "${item.name}"?'),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () =>
-                                                            Navigator.of(
-                                                                    context)
-                                                                .pop(false),
-                                                        child: const Text(
-                                                            AppStrings.cancel),
-                                                      ),
-                                                      TextButton(
-                                                        onPressed: () =>
-                                                            Navigator.of(
-                                                                    context)
-                                                                .pop(true),
-                                                        child: const Text(
-                                                            AppStrings.delete,
-                                                            style: TextStyle(
-                                                                color: Colors
-                                                                    .red)),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-
-                                                if (confirm ?? false) {
-                                                  await _repository
-                                                      .deleteRentalItem(
-                                                          item.id);
-                                                  _refreshItems();
-                                                }
-                                              }
-                                            : null,
-                                        tooltip: widget.kit.isOpen
-                                            ? AppStrings.delete
-                                            : 'Cannot delete (Kit closed)',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (item.imagePath != null ||
-                                    item.imageDataUrl != null)
-                                  Container(
-                                    width: double.infinity,
-                                    height: 200,
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    child: InkWell(
-                                      onTap: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (context) => Scaffold(
-                                              appBar: AppBar(
-                                                title: Text(item.name),
-                                              ),
-                                              body: Center(
-                                                child: InteractiveViewer(
-                                                  panEnabled: true,
-                                                  boundaryMargin:
-                                                      const EdgeInsets.all(20),
-                                                  minScale: 0.5,
-                                                  maxScale: 4,
-                                                  child: _imageHelper
-                                                      .buildItemImage(item),
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              child: InkWell(
+                                // Make the entire card clickable
+                                onTap: widget.kit.isOpen
+                                    ? () {
+                                        Navigator.of(context)
+                                            .push(
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    AddItemScreen(
+                                                  kitId: widget.kit.id,
+                                                  existingItem: item,
                                                 ),
                                               ),
-                                            ),
+                                            )
+                                            .then((_) => _refreshItems());
+                                      }
+                                    : null, // Disable if kit is closed
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ListTile(
+                                      title: Text(item.name),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Added: $formattedDate'),
+                                          if (item.category != null)
+                                            Text('Category: ${item.category}'),
+                                          if (item.notes != null &&
+                                              item.notes!.isNotEmpty)
+                                            Text('Notes: ${item.notes}'),
+                                        ],
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.camera_alt),
+                                            onPressed: () => _takePicture(item),
+                                            tooltip: AppStrings.takePhoto,
                                           ),
-                                        );
-                                      },
-                                      child: Hero(
-                                        tag: 'image-${item.id}',
-                                        child:
-                                            _imageHelper.buildItemImage(item),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete,
+                                                color: Colors.grey),
+                                            onPressed: widget.kit.isOpen
+                                                ? () async {
+                                                    final confirm =
+                                                        await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (context) =>
+                                                          AlertDialog(
+                                                        title: const Text(
+                                                            AppStrings
+                                                                .deleteItem),
+                                                        content: Text(
+                                                            'Are you sure you want to delete "${item.name}"?'),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.of(
+                                                                        context)
+                                                                    .pop(false),
+                                                            child: const Text(
+                                                                AppStrings
+                                                                    .cancel),
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.of(
+                                                                        context)
+                                                                    .pop(true),
+                                                            child: const Text(
+                                                                AppStrings
+                                                                    .delete,
+                                                                style: TextStyle(
+                                                                    color: Colors
+                                                                        .red)),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+
+                                                    if (confirm ?? false) {
+                                                      await _repository
+                                                          .deleteRentalItem(
+                                                              item.id);
+                                                      _refreshItems();
+                                                    }
+                                                  }
+                                                : null,
+                                            tooltip: widget.kit.isOpen
+                                                ? AppStrings.delete
+                                                : 'Cannot delete (Kit closed)',
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          );
+                                    if (item.imagePath != null ||
+                                        item.imageDataUrl != null)
+                                      Container(
+                                        width: double.infinity,
+                                        height: 200,
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: InkWell(
+                                          onTap: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (context) => Scaffold(
+                                                  appBar: AppBar(
+                                                    title: Text(item.name),
+                                                  ),
+                                                  body: Center(
+                                                    child: InteractiveViewer(
+                                                      panEnabled: true,
+                                                      boundaryMargin:
+                                                          const EdgeInsets.all(
+                                                              20),
+                                                      minScale: 0.5,
+                                                      maxScale: 4,
+                                                      child: _imageHelper
+                                                          .buildItemImage(item),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: Hero(
+                                            tag: 'image-${item.id}',
+                                            child: _imageHelper
+                                                .buildItemImage(item),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ));
                         },
                       ),
           ),

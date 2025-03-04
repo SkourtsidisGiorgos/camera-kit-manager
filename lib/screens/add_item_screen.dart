@@ -1,8 +1,14 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/rental_item.dart';
 import '../models/equipment_category.dart';
 import '../data/repository.dart';
 import '../utils/constants.dart';
+import '../utils/image_helper.dart';
 
 class AddItemScreen extends StatefulWidget {
   final String kitId;
@@ -22,13 +28,18 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _itemNameController = TextEditingController();
   final _notesController = TextEditingController();
+  final _costController = TextEditingController(); // Added cost controller
   final _repository = DataRepository();
+  final _imageHelper = ImageHelper(); // Added ImageHelper
 
   List<EquipmentCategory> _categories = [];
   List<String> _predefinedItems = [];
   String? _selectedCategory;
   bool _isCustomItem = true;
   bool _isLoading = true;
+
+  String? _imagePath; // For mobile
+  String? _imageDataUrl; // For web
 
   @override
   void initState() {
@@ -42,6 +53,11 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (widget.existingItem!.notes != null) {
         _notesController.text = widget.existingItem!.notes!;
       }
+      if (widget.existingItem!.cost != null) {
+        _costController.text = widget.existingItem!.cost!.toString();
+      }
+      _imagePath = widget.existingItem!.imagePath;
+      _imageDataUrl = widget.existingItem!.imageDataUrl;
     }
   }
 
@@ -49,6 +65,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
   void dispose() {
     _itemNameController.dispose();
     _notesController.dispose();
+    _costController.dispose();
     super.dispose();
   }
 
@@ -101,20 +118,81 @@ class _AddItemScreenState extends State<AddItemScreen> {
     });
   }
 
+  Future<void> _takePicture() async {
+    try {
+      final XFile? image = await _imageHelper.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          if (kIsWeb) {
+            _imageDataUrl =
+                'https://example.com/placeholder.jpg'; // Placeholder for web
+          } else {
+            _imagePath = image.path; // Temporary path for mobile
+          }
+        });
+      }
+    } catch (e) {
+      // Show error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error taking picture: ${e.toString()}')),
+      );
+    }
+  }
+
   Future<void> _saveItem() async {
     if (_formKey.currentState?.validate() ?? false) {
+      // Parse cost
+      double? cost;
+      if (_costController.text.isNotEmpty) {
+        cost = double.tryParse(_costController.text);
+      }
+
       final item = RentalItem(
         id: widget.existingItem?.id,
         kitId: widget.kitId,
         name: _itemNameController.text,
         dateAdded: widget.existingItem?.dateAdded ?? DateTime.now(),
-        imagePath: widget.existingItem?.imagePath,
-        imageDataUrl: widget.existingItem?.imageDataUrl,
+        imagePath: _imagePath ?? widget.existingItem?.imagePath,
+        imageDataUrl: _imageDataUrl ?? widget.existingItem?.imageDataUrl,
         category: _selectedCategory,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
+        cost: cost,
       );
 
-      await _repository.saveRentalItem(item);
+      // Save image to permanent location if needed
+      if (_imagePath != null &&
+          _imagePath != widget.existingItem?.imagePath &&
+          !kIsWeb) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${item.id}.jpg';
+        final savedImage = File('${appDir.path}/$fileName');
+        await File(_imagePath!).copy(savedImage.path);
+
+        // Update with permanent path
+        final updatedItem = RentalItem(
+          id: item.id,
+          kitId: item.kitId,
+          name: item.name,
+          dateAdded: item.dateAdded,
+          imagePath: savedImage.path,
+          imageDataUrl: item.imageDataUrl,
+          category: item.category,
+          notes: item.notes,
+          cost: item.cost,
+        );
+
+        await _repository.saveRentalItem(updatedItem);
+      } else {
+        await _repository.saveRentalItem(item);
+      }
+
       Navigator.of(context).pop();
     }
   }
@@ -228,6 +306,58 @@ class _AddItemScreenState extends State<AddItemScreen> {
                         border: OutlineInputBorder(),
                       ),
                       maxLines: 3,
+                    ),
+
+                    // Cost TextField
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _costController,
+                      decoration: const InputDecoration(
+                        labelText: 'Cost (Optional)',
+                        hintText: 'Item cost',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Photo Section
+                    const Text(
+                      'Item Photo (Optional)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Display existing image if any
+                    if (_imagePath != null ||
+                        _imageDataUrl != null ||
+                        widget.existingItem?.imagePath != null ||
+                        widget.existingItem?.imageDataUrl != null)
+                      Container(
+                        width: double.infinity,
+                        height: 200,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: _imageHelper.buildItemImage(
+                          RentalItem(
+                            id: widget.existingItem?.id ?? 'temp',
+                            kitId: widget.kitId,
+                            name: _itemNameController.text,
+                            dateAdded: DateTime.now(),
+                            imagePath:
+                                _imagePath ?? widget.existingItem?.imagePath,
+                            imageDataUrl: _imageDataUrl ??
+                                widget.existingItem?.imageDataUrl,
+                          ),
+                        ),
+                      ),
+
+                    // Take photo button
+                    ElevatedButton.icon(
+                      onPressed: _takePicture,
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text(AppStrings.takePhoto),
                     ),
 
                     const SizedBox(height: 24),
