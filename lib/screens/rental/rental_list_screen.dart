@@ -42,10 +42,11 @@ class _RentalListScreenState extends State<RentalListScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _rentals.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No rentals yet.\nTap "+" to add a new rental.',
                     textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 )
               : ListView.builder(

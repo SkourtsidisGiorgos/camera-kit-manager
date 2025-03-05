@@ -228,9 +228,6 @@ class _KitListScreenState extends State<KitListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.appTitle),
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _kits.isEmpty

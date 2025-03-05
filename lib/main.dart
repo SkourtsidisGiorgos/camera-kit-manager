@@ -67,7 +67,7 @@ class _MainScreenState extends State<MainScreen> {
   // Screen titles
   final List<String> _titles = [
     AppStrings.appTitle,
-    'Rentals',
+    'Camera Kit Manager',
   ];
 
   // Screen widgets
