@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:camera_kit_manager/core/utils/image_viewer_utils.dart';
-import 'package:camera_kit_manager/presentation/screens/common/image_viewer_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
