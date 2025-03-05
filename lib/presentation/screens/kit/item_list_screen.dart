@@ -1,16 +1,14 @@
-import 'package:camera_kit_manager/data/category_repository.dart';
-import 'package:camera_kit_manager/presentation/screens/kit/add_item_screen.dart';
+// lib/presentation/screens/kit/item_list_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'dart:io';
 import '../../../domain/entities/kit.dart';
 import '../../../domain/entities/rental_item.dart';
 import '../../../data/item_repository.dart';
 import '../../../core/utils/constants.dart';
 import '../../../core/utils/image_helper.dart';
+import '../../widgets/ui_components.dart';
+import '../../widgets/common_widgets.dart';
+import 'add_item_screen.dart';
 
 class ItemListScreen extends StatefulWidget {
   final Kit kit;
@@ -63,7 +61,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
   Future<void> _shareKit() async {
     String content = 'EQUIPMENT KIT: ${widget.kit.name}\n';
     content +=
-        'Date Created: ${DateFormat('MMM d, yyyy').format(widget.kit.dateCreated)}\n';
+        'Date Created: ${DateFormatter.format(widget.kit.dateCreated)}\n';
     content +=
         'Status: ${widget.kit.isOpen ? AppStrings.statusOpen : AppStrings.statusClosed}\n\n';
     content += 'EQUIPMENT ITEMS:\n';
@@ -74,8 +72,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
       if (item.category != null) {
         content += '   Category: ${item.category}\n';
       }
-      content +=
-          '   Added: ${DateFormat('MMM d, yyyy').format(item.dateAdded)}\n';
+      content += '   Added: ${DateFormatter.format(item.dateAdded)}\n';
       content +=
           '   Has Photo: ${(item.imagePath != null || item.imageDataUrl != null) ? 'Yes' : 'No'}\n';
       if (item.notes != null && item.notes!.isNotEmpty) {
@@ -84,23 +81,50 @@ class _ItemListScreenState extends State<ItemListScreen> {
       content += '\n';
     }
 
-    if (kIsWeb) {
-      // For web, we can only share text
-      await Share.share(
-        content,
-        subject: 'Equipment Kit: ${widget.kit.name}',
-      );
-    } else {
-      // For mobile platforms, we can share files
-      final appDir = await getApplicationDocumentsDirectory();
-      final reportFile = File('${appDir.path}/kit_report_${widget.kit.id}.txt');
-      await reportFile.writeAsString(content);
+    // Share report
+    await Share.share(
+      'Equipment Kit: ${widget.kit.name}\n\n$content',
+      subject: 'Equipment Kit: ${widget.kit.name}',
+    );
+  }
 
-      await Share.share(
-        'Equipment Kit: ${widget.kit.name}\n\n$content',
-        subject: 'Equipment Kit: ${widget.kit.name}',
-      );
+  Future<void> _deleteItem(RentalItem item) async {
+    final confirm = await ConfirmationDialog.show(
+      context: context,
+      title: AppStrings.deleteItem,
+      message: 'Are you sure you want to delete "${item.name}"?',
+      confirmText: AppStrings.delete,
+      isDangerous: true,
+    );
+
+    if (confirm) {
+      await _itemRepository.deleteRentalItem(item.id);
+      _refreshItems();
     }
+  }
+
+  void _viewItemImage(RentalItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text(item.name),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              panEnabled: true,
+              boundaryMargin: const EdgeInsets.all(20),
+              minScale: 0.5,
+              maxScale: 4,
+              child: Hero(
+                tag: 'image-${item.id}',
+                child: _imageHelper.buildItemImage(item),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -118,190 +142,60 @@ class _ItemListScreenState extends State<ItemListScreen> {
       ),
       body: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: widget.kit.isOpen
-                ? AppColors.openStatusLight
-                : AppColors.closedStatusLight,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Status: ${widget.kit.isOpen ? AppStrings.statusOpen : AppStrings.statusClosed}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: widget.kit.isOpen
-                        ? AppColors.openStatus
-                        : AppColors.closedStatus,
-                  ),
-                ),
-                Text(
-                  'Created: ${DateFormat('MMM d, yyyy').format(widget.kit.dateCreated)}',
-                  style: const TextStyle(fontStyle: FontStyle.italic),
-                ),
-              ],
-            ),
-          ),
+          // Kit status container
+          KitStatusFormatter.build(widget.kit),
+
+          // Items list
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingView()
                 : _items.isEmpty
-                    ? Center(
-                        child: Text(
-                          AppStrings.noItems,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
+                    ? const EmptyStateView(
+                        message: AppStrings.noItems,
+                        icon: Icons.inventory_2,
                       )
                     : ListView.builder(
                         itemCount: _items.length,
                         itemBuilder: (context, index) {
                           final item = _items[index];
-                          final formattedDate =
-                              DateFormat('MMM d, yyyy').format(item.dateAdded);
 
-                          return Card(
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
+                          // Build image widget if available
+                          Widget? itemImage;
+                          if (item.imagePath != null ||
+                              item.imageDataUrl != null) {
+                            itemImage = Container(
+                              width: double.infinity,
+                              height: 200,
+                              margin: const EdgeInsets.only(bottom: 8),
                               child: InkWell(
-                                // Make the entire card clickable
-                                onTap: widget.kit.isOpen
-                                    ? () {
-                                        Navigator.of(context)
-                                            .push(
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    AddItemScreen(
-                                                  kitId: widget.kit.id,
-                                                  existingItem: item,
-                                                ),
-                                              ),
-                                            )
-                                            .then((_) => _refreshItems());
-                                      }
-                                    : null, // Disable if kit is closed
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ListTile(
-                                      title: Text(item.name),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text('Added: $formattedDate'),
-                                          if (item.category != null)
-                                            Text('Category: ${item.category}'),
-                                          if (item.notes != null &&
-                                              item.notes!.isNotEmpty)
-                                            Text('Notes: ${item.notes}'),
-                                        ],
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.camera_alt),
-                                            onPressed: () => _takePicture(item),
-                                            tooltip: AppStrings.takePhoto,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete,
-                                                color: Colors.grey),
-                                            onPressed: widget.kit.isOpen
-                                                ? () async {
-                                                    final confirm =
-                                                        await showDialog<bool>(
-                                                      context: context,
-                                                      builder: (context) =>
-                                                          AlertDialog(
-                                                        title: const Text(
-                                                            AppStrings
-                                                                .deleteItem),
-                                                        content: Text(
-                                                            'Are you sure you want to delete "${item.name}"?'),
-                                                        actions: [
-                                                          TextButton(
-                                                            onPressed: () =>
-                                                                Navigator.of(
-                                                                        context)
-                                                                    .pop(false),
-                                                            child: const Text(
-                                                                AppStrings
-                                                                    .cancel),
-                                                          ),
-                                                          TextButton(
-                                                            onPressed: () =>
-                                                                Navigator.of(
-                                                                        context)
-                                                                    .pop(true),
-                                                            child: const Text(
-                                                                AppStrings
-                                                                    .delete,
-                                                                style: TextStyle(
-                                                                    color: Colors
-                                                                        .red)),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
+                                onTap: () => _viewItemImage(item),
+                                child: Hero(
+                                  tag: 'image-${item.id}',
+                                  child: _imageHelper.buildItemImage(item),
+                                ),
+                              ),
+                            );
+                          }
 
-                                                    if (confirm ?? false) {
-                                                      await _itemRepository
-                                                          .deleteRentalItem(
-                                                              item.id);
-                                                      _refreshItems();
-                                                    }
-                                                  }
-                                                : null,
-                                            tooltip: widget.kit.isOpen
-                                                ? AppStrings.delete
-                                                : 'Cannot delete (Kit closed)',
-                                          ),
-                                        ],
+                          return RentalItemTile.withDefaultActions(
+                            item: item,
+                            isKitOpen: widget.kit.isOpen,
+                            onTap: () {
+                              Navigator.of(context)
+                                  .push(
+                                    MaterialPageRoute(
+                                      builder: (context) => AddItemScreen(
+                                        kitId: widget.kit.id,
+                                        existingItem: item,
                                       ),
                                     ),
-                                    if (item.imagePath != null ||
-                                        item.imageDataUrl != null)
-                                      Container(
-                                        width: double.infinity,
-                                        height: 200,
-                                        margin:
-                                            const EdgeInsets.only(bottom: 8),
-                                        child: InkWell(
-                                          onTap: () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (context) => Scaffold(
-                                                  appBar: AppBar(
-                                                    title: Text(item.name),
-                                                  ),
-                                                  body: Center(
-                                                    child: InteractiveViewer(
-                                                      panEnabled: true,
-                                                      boundaryMargin:
-                                                          const EdgeInsets.all(
-                                                              20),
-                                                      minScale: 0.5,
-                                                      maxScale: 4,
-                                                      child: _imageHelper
-                                                          .buildItemImage(item),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: Hero(
-                                            tag: 'image-${item.id}',
-                                            child: _imageHelper
-                                                .buildItemImage(item),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ));
+                                  )
+                                  .then((_) => _refreshItems());
+                            },
+                            onTakePicture: () => _takePicture(item),
+                            onDelete: () => _deleteItem(item),
+                            itemImage: itemImage,
+                          );
                         },
                       ),
           ),

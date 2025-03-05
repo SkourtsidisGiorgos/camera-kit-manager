@@ -1,4 +1,4 @@
-// lib/presentation/widgets/ui_components.dart
+//TODO: split this monstrosity into smaller files into widgets/kits, widgets/rentals
 
 import 'dart:io';
 import 'package:flutter/material.dart';

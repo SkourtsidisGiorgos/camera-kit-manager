@@ -70,10 +70,10 @@ class StatusContainer extends StatelessWidget {
   final String? dateText;
 
   const StatusContainer({
-    Key? key,
+    super.key,
     required this.isOpen,
     this.dateText,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -196,12 +196,12 @@ class ActionButton extends StatelessWidget {
   final Color? color;
 
   const ActionButton({
-    Key? key,
+    super.key,
     required this.icon,
     this.onPressed,
     this.tooltip,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +213,6 @@ class ActionButton extends StatelessWidget {
   }
 }
 
-/// A consistent form field with standard styling
 class AppFormField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -226,7 +225,7 @@ class AppFormField extends StatelessWidget {
   final String? Function(String?)? validator;
 
   const AppFormField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.label,
     this.hint,
@@ -236,7 +235,7 @@ class AppFormField extends StatelessWidget {
     this.suffix,
     this.enabled = true,
     this.validator,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -5,6 +5,8 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:intl/intl.dart';
 import '../../../infastructure/services/backup_service.dart';
 import '../../../infastructure/services/google_drive_service.dart';
+import '../../widgets/common_widgets.dart';
+import '../../widgets/ui_components.dart';
 
 class BackupSettingsScreen extends StatefulWidget {
   const BackupSettingsScreen({super.key});
@@ -29,9 +31,27 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     _refreshDriveFiles();
   }
 
-  Future<void> _refreshDriveFiles() async {
-    if (!_driveService.isSignedIn) return;
+  // Display success message
+  void _showSuccess(String message) {
+    setState(() {
+      _errorMessage = null;
+      _successMessage = message;
+    });
+  }
 
+  // Display error message
+  void _showError(String message) {
+    setState(() {
+      _successMessage = null;
+      _errorMessage = message;
+    });
+  }
+
+  // Handle async operations with loading state
+  Future<void> _performOperation(
+    Future<void> Function() operation,
+    String errorPrefix,
+  ) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -39,101 +59,59 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     });
 
     try {
+      await operation();
+    } catch (e) {
+      _showError('$errorPrefix: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshDriveFiles() async {
+    if (!_driveService.isSignedIn) return;
+
+    _performOperation(() async {
       final files = await _driveService.getBackupFiles();
       setState(() {
         _backupFiles = files;
       });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load backup files: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to load backup files');
   }
 
   Future<void> _signInToGoogleDrive() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       final success = await _driveService.signIn();
       if (success) {
-        setState(() {
-          _successMessage = 'Signed in successfully to Google Drive';
-        });
-        _refreshDriveFiles();
+        _showSuccess('Signed in successfully to Google Drive');
+        await _refreshDriveFiles();
       } else {
-        setState(() {
-          _errorMessage = 'Google Drive sign-in was canceled';
-        });
+        _showError('Google Drive sign-in was canceled');
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to sign in to Google Drive: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to sign in to Google Drive');
   }
 
   Future<void> _signOutFromGoogleDrive() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       await _driveService.signOut();
       setState(() {
         _backupFiles = [];
-        _successMessage = 'Signed out from Google Drive';
+        _showSuccess('Signed out from Google Drive');
       });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to sign out: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to sign out');
   }
 
   Future<void> _createBackup() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       final backupFile =
           await _backupService.createBackup(includeImages: _includeImages);
-      setState(() {
-        _successMessage = 'Backup created successfully';
-      });
+      _showSuccess('Backup created successfully');
 
       // Show options dialog
       if (!mounted) return;
       _showBackupOptionsDialog(backupFile);
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to create backup: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to create backup');
   }
 
   void _showBackupOptionsDialog(File backupFile) {
@@ -170,23 +148,9 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
   }
 
   Future<void> _shareBackup() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       await _backupService.shareBackup(includeImages: _includeImages);
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to share backup: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to share backup');
   }
 
   Future<void> _uploadBackupToDrive(File backupFile) async {
@@ -195,45 +159,21 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       if (!_driveService.isSignedIn) return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       final fileName = backupFile.path.split('/').last;
       final fileId = await _driveService.uploadBackup(backupFile, fileName);
 
       if (fileId != null) {
-        setState(() {
-          _successMessage = 'Backup uploaded to Google Drive successfully';
-        });
-        _refreshDriveFiles();
+        _showSuccess('Backup uploaded to Google Drive successfully');
+        await _refreshDriveFiles();
       } else {
-        setState(() {
-          _errorMessage = 'Failed to upload backup to Google Drive';
-        });
+        _showError('Failed to upload backup to Google Drive');
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to upload to Google Drive: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to upload to Google Drive');
   }
 
   Future<void> _importBackup() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       // Show warning dialog
       if (!mounted) return;
       final proceedWithImport = await _showImportWarningDialog();
@@ -244,42 +184,21 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
 
       final backupFile = await _backupService.pickBackupFile();
       if (backupFile == null) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'No backup file selected';
-        });
+        _showError('No backup file selected');
         return;
       }
 
       final success = await _backupService.restoreFromBackup(backupFile);
       if (success) {
-        setState(() {
-          _successMessage = 'Backup restored successfully';
-        });
+        _showSuccess('Backup restored successfully');
       } else {
-        setState(() {
-          _errorMessage = 'Failed to restore backup';
-        });
+        _showError('Failed to restore backup');
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to import backup: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to import backup');
   }
 
   Future<void> _restoreFromDrive(drive.File driveFile) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       // Show warning dialog
       if (!mounted) return;
       final proceedWithImport = await _showImportWarningDialog();
@@ -290,108 +209,51 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
 
       final localFile = await _driveService.downloadBackup(driveFile.id!);
       if (localFile == null) {
-        setState(() {
-          _errorMessage = 'Failed to download backup file';
-        });
+        _showError('Failed to download backup file');
         return;
       }
 
       final success = await _backupService.restoreFromBackup(localFile);
       if (success) {
-        setState(() {
-          _successMessage = 'Backup restored successfully';
-        });
+        _showSuccess('Backup restored successfully');
       } else {
-        setState(() {
-          _errorMessage = 'Failed to restore backup';
-        });
+        _showError('Failed to restore backup');
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to restore from Google Drive: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to restore from Google Drive');
   }
 
   Future<void> _deleteFromDrive(drive.File driveFile) async {
-    // Show confirmation dialog
-    final confirm = await showDialog<bool>(
+    final confirm = await ConfirmationDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Backup'),
-        content: Text(
-            'Are you sure you want to delete "${driveFile.name}" from Google Drive?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Backup',
+      message:
+          'Are you sure you want to delete "${driveFile.name}" from Google Drive?',
+      confirmText: 'Delete',
+      isDangerous: true,
     );
 
-    if (confirm != true) return;
+    if (!confirm) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
+    await _performOperation(() async {
       final success = await _driveService.deleteFile(driveFile.id!);
       if (success) {
-        setState(() {
-          _successMessage = 'Backup deleted successfully';
-        });
-        _refreshDriveFiles();
+        _showSuccess('Backup deleted successfully');
+        await _refreshDriveFiles();
       } else {
-        setState(() {
-          _errorMessage = 'Failed to delete backup';
-        });
+        _showError('Failed to delete backup');
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to delete from Google Drive: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    }, 'Failed to delete from Google Drive');
   }
 
   Future<bool> _showImportWarningDialog() async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Warning'),
-            content: const Text(
-              'Importing a backup will REPLACE ALL CURRENT DATA. This cannot be undone.\n\nDo you want to continue?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Import & Replace Data'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    return await ConfirmationDialog.show(
+      context: context,
+      title: 'Warning',
+      message:
+          'Importing a backup will REPLACE ALL CURRENT DATA. This cannot be undone.\n\nDo you want to continue?',
+      confirmText: 'Import & Replace Data',
+      isDangerous: true,
+    );
   }
 
   String _formatFileSize(int? bytes) {
@@ -416,7 +278,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         title: const Text('Backup & Restore'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -424,233 +286,242 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                 children: [
                   // Error/Success Messages
                   if (_errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.red.shade700),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(color: Colors.red.shade700),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildMessageCard(_errorMessage!, Colors.red.shade100,
+                        Colors.red.shade700, Icons.error_outline),
 
                   if (_successMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle_outline,
-                              color: Colors.green.shade700),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _successMessage!,
-                              style: TextStyle(color: Colors.green.shade700),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildMessageCard(_successMessage!, Colors.green.shade100,
+                        Colors.green.shade700, Icons.check_circle_outline),
 
                   // Local Backup Section
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Local Backup',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Include images option (not available for web)
-                          if (!kIsWeb)
-                            SwitchListTile(
-                              title: const Text('Include Images'),
-                              subtitle: const Text(
-                                  'Backup will be larger but will include all photos'),
-                              value: _includeImages,
-                              onChanged: (value) {
-                                setState(() {
-                                  _includeImages = value;
-                                });
-                              },
-                            ),
-
-                          const SizedBox(height: 16),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _createBackup,
-                                  icon: const Icon(Icons.backup),
-                                  label: const Text('Create Backup'),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _importBackup,
-                                  icon: const Icon(Icons.upload_file),
-                                  label: const Text('Import Backup'),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          ElevatedButton.icon(
-                            onPressed: _shareBackup,
-                            icon: const Icon(Icons.share),
-                            label: const Text('Share Backup'),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(40),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildLocalBackupCard(),
 
                   // Google Drive Section
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Google Drive',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          if (!_driveService.isSignedIn) ...[
-                            const Text(
-                                'Sign in to Google Drive to backup and sync your data across devices.'),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _signInToGoogleDrive,
-                              icon: const Icon(Icons.login),
-                              label: const Text('Sign in to Google Drive'),
-                              style: ElevatedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(40),
-                              ),
-                            ),
-                          ] else ...[
-                            ListTile(
-                              leading: const CircleAvatar(
-                                child: Icon(Icons.account_circle),
-                              ),
-                              title: Text(_driveService.userName),
-                              subtitle: Text(_driveService.userEmail),
-                              trailing: TextButton.icon(
-                                onPressed: _signOutFromGoogleDrive,
-                                icon: const Icon(Icons.logout, size: 16),
-                                label: const Text('Sign Out'),
-                              ),
-                            ),
-                            const Divider(),
-                            const Text(
-                              'Google Drive Backups',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_backupFiles.isEmpty) ...[
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child:
-                                      Text('No backups found in Google Drive'),
-                                ),
-                              ),
-                            ] else ...[
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _backupFiles.length,
-                                itemBuilder: (context, index) {
-                                  final file = _backupFiles[index];
-                                  final fileName =
-                                      file.name ?? 'Unnamed Backup';
-                                  final modifiedTime = file.modifiedTime != null
-                                      ? DateFormat('MMM d, yyyy h:mm a')
-                                          .format(file.modifiedTime!)
-                                      : 'Unknown date';
-                                  final fileSize = _formatFileSize(
-                                      int.tryParse(file.size ?? '0'));
-
-                                  return ListTile(
-                                    title: Text(fileName),
-                                    subtitle: Text('$modifiedTime • $fileSize'),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.restore),
-                                          onPressed: () =>
-                                              _restoreFromDrive(file),
-                                          tooltip: 'Restore from this backup',
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete,
-                                              color: Colors.grey),
-                                          onPressed: () =>
-                                              _deleteFromDrive(file),
-                                          tooltip: 'Delete this backup',
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _refreshDriveFiles,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Refresh'),
-                              style: ElevatedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(40),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildGoogleDriveCard(),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildMessageCard(
+      String message, Color bgColor, Color textColor, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: textColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: textColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocalBackupCard() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Local Backup',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Include images option (not available for web)
+            if (!kIsWeb)
+              SwitchListTile(
+                title: const Text('Include Images'),
+                subtitle: const Text(
+                    'Backup will be larger but will include all photos'),
+                value: _includeImages,
+                onChanged: (value) {
+                  setState(() {
+                    _includeImages = value;
+                  });
+                },
+              ),
+
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _createBackup,
+                    icon: const Icon(Icons.backup),
+                    label: const Text('Create Backup'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _importBackup,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Import Backup'),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            ElevatedButton.icon(
+              onPressed: _shareBackup,
+              icon: const Icon(Icons.share),
+              label: const Text('Share Backup'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(40),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoogleDriveCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Google Drive',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (!_driveService.isSignedIn)
+              _buildDriveSignInSection()
+            else
+              _buildDriveSignedInSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDriveSignInSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+            'Sign in to Google Drive to backup and sync your data across devices.'),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _signInToGoogleDrive,
+          icon: const Icon(Icons.login),
+          label: const Text('Sign in to Google Drive'),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size.fromHeight(40),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDriveSignedInSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          leading: const CircleAvatar(
+            child: Icon(Icons.account_circle),
+          ),
+          title: Text(_driveService.userName),
+          subtitle: Text(_driveService.userEmail),
+          trailing: TextButton.icon(
+            onPressed: _signOutFromGoogleDrive,
+            icon: const Icon(Icons.logout, size: 16),
+            label: const Text('Sign Out'),
+          ),
+        ),
+        const Divider(),
+        const Text(
+          'Google Drive Backups',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_backupFiles.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No backups found in Google Drive'),
+            ),
+          )
+        else
+          _buildBackupFilesList(),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _refreshDriveFiles,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Refresh'),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size.fromHeight(40),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBackupFilesList() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _backupFiles.length,
+      itemBuilder: (context, index) {
+        final file = _backupFiles[index];
+        final fileName = file.name ?? 'Unnamed Backup';
+        final modifiedTime = file.modifiedTime != null
+            ? DateFormat('MMM d, yyyy h:mm a').format(file.modifiedTime!)
+            : 'Unknown date';
+        final fileSize = _formatFileSize(int.tryParse(file.size ?? '0'));
+
+        return ListTile(
+          title: Text(fileName),
+          subtitle: Text('$modifiedTime • $fileSize'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ActionButton(
+                icon: Icons.restore,
+                onPressed: () => _restoreFromDrive(file),
+                tooltip: 'Restore from this backup',
+              ),
+              ActionButton(
+                icon: Icons.delete,
+                onPressed: () => _deleteFromDrive(file),
+                color: Colors.grey,
+                tooltip: 'Delete this backup',
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
