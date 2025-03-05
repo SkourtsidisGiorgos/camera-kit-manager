@@ -1,6 +1,5 @@
 import 'dart:io';
-
-import 'package:camera_kit_manager/data/category_repository.dart';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../domain/entities/rental_item.dart';
 import '../../../domain/entities/equipment_category.dart';
 import '../../../data/item_repository.dart';
+import '../../../data/category_repository.dart';
 import '../../../core/utils/constants.dart';
 import '../../../core/utils/image_helper.dart';
 
@@ -29,19 +29,28 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _itemNameController = TextEditingController();
   final _notesController = TextEditingController();
-  final _costController = TextEditingController(); // Added cost controller
-  final _item_repository = ItemRepository();
-  final _category_repository = CategoryRepository();
-  final _imageHelper = ImageHelper(); // Added ImageHelper
+  final _costController = TextEditingController();
+  final _itemRepository = ItemRepository();
+  final _categoryRepository = CategoryRepository();
+  final _imageHelper = ImageHelper();
+  final _debouncer = Debouncer(milliseconds: 500);
 
   List<EquipmentCategory> _categories = [];
   List<String> _predefinedItems = [];
   String? _selectedCategory;
   bool _isCustomItem = true;
   bool _isLoading = true;
+  bool _isSaving = false;
 
-  String? _imagePath; // For mobile
-  String? _imageDataUrl; // For web
+  // Legacy photo support
+  String? _imagePath;
+  String? _imageDataUrl;
+
+  // Multiple photos
+  List<ItemPhoto> _photos = [];
+
+  // Current item being edited
+  RentalItem? _currentItem;
 
   @override
   void initState() {
@@ -60,22 +69,44 @@ class _AddItemScreenState extends State<AddItemScreen> {
       }
       _imagePath = widget.existingItem!.imagePath;
       _imageDataUrl = widget.existingItem!.imageDataUrl;
+      _photos = List.from(widget.existingItem!.photos);
+      _currentItem = widget.existingItem;
     }
+
+    // Add listeners for auto-save
+    _itemNameController.addListener(_onFieldChanged);
+    _notesController.addListener(_onFieldChanged);
+    _costController.addListener(_onFieldChanged);
   }
 
   @override
   void dispose() {
+    // Remove listeners
+    _itemNameController.removeListener(_onFieldChanged);
+    _notesController.removeListener(_onFieldChanged);
+    _costController.removeListener(_onFieldChanged);
+
+    // Dispose controllers
     _itemNameController.dispose();
     _notesController.dispose();
     _costController.dispose();
     super.dispose();
   }
 
+  void _onFieldChanged() {
+    // Auto-save changes after a short delay
+    if (_formKey.currentState?.validate() ?? false) {
+      _debouncer.run(() {
+        _saveItem();
+      });
+    }
+  }
+
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
 
-    await _category_repository.initDefaultCategoriesIfEmpty();
-    final categories = await _category_repository.getAllCategories();
+    await _categoryRepository.initDefaultCategoriesIfEmpty();
+    final categories = await _categoryRepository.getAllCategories();
 
     setState(() {
       _categories = categories;
@@ -106,6 +137,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
         _predefinedItems = [];
         _isCustomItem = true;
       }
+
+      // Auto-save on category change
+      _onFieldChanged();
     });
   }
 
@@ -113,11 +147,21 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() {
       _itemNameController.text = itemName;
       _isCustomItem = false;
+
+      // Auto-save when selecting predefined item
+      _onFieldChanged();
     });
   }
 
   Future<void> _takePicture() async {
     try {
+      if (_photos.length >= 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Maximum of 3 photos allowed per item')),
+        );
+        return;
+      }
+
       final XFile? image = await _imageHelper.pickImage(
         source: ImageSource.camera,
         maxWidth: 1200,
@@ -128,12 +172,24 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (image != null) {
         setState(() {
           if (kIsWeb) {
-            _imageDataUrl =
-                'https://example.com/placeholder.jpg'; // Placeholder for web
+            // For web, use placeholder data URL
+            final newPhoto = ItemPhoto(
+              dateAdded: DateTime.now(),
+              imageDataUrl: 'https://example.com/placeholder.jpg',
+            );
+            _photos.add(newPhoto);
           } else {
-            _imagePath = image.path; // Temporary path for mobile
+            // For mobile, store temporary path (will be copied to permanent location on save)
+            final newPhoto = ItemPhoto(
+              dateAdded: DateTime.now(),
+              imagePath: image.path,
+            );
+            _photos.add(newPhoto);
           }
         });
+
+        // Auto-save after adding a photo
+        _saveItem();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,14 +198,107 @@ class _AddItemScreenState extends State<AddItemScreen> {
     }
   }
 
+  Future<void> _pickPicture() async {
+    try {
+      if (_photos.length >= 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Maximum of 3 photos allowed per item')),
+        );
+        return;
+      }
+
+      final XFile? image = await _imageHelper.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          if (kIsWeb) {
+            // For web, use placeholder data URL
+            final newPhoto = ItemPhoto(
+              dateAdded: DateTime.now(),
+              imageDataUrl: 'https://example.com/placeholder.jpg',
+            );
+            _photos.add(newPhoto);
+          } else {
+            // For mobile, store temporary path (will be copied to permanent location on save)
+            final newPhoto = ItemPhoto(
+              dateAdded: DateTime.now(),
+              imagePath: image.path,
+            );
+            _photos.add(newPhoto);
+          }
+        });
+
+        // Auto-save after adding a photo
+        _saveItem();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking picture: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _removePhoto(int index) {
+    setState(() {
+      _photos.removeAt(index);
+
+      // Auto-save after removing a photo
+      _saveItem();
+    });
+  }
+
   Future<void> _saveItem() async {
-    if (_formKey.currentState?.validate() ?? false) {
+    if (_isSaving || !(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
       // Parse cost
       double? cost;
       if (_costController.text.isNotEmpty) {
         cost = double.tryParse(_costController.text);
       }
 
+      // Process photos - First make a copy of the photos list
+      List<ItemPhoto> processedPhotos = List.from(_photos);
+
+      // If not on web, save images to permanent location
+      if (!kIsWeb) {
+        final appDir = await getApplicationDocumentsDirectory();
+
+        // Process each photo
+        for (int i = 0; i < processedPhotos.length; i++) {
+          final photo = processedPhotos[i];
+
+          // Skip photos that already have a permanent path or photos from existing item
+          if (photo.imagePath != null &&
+              (widget.existingItem == null ||
+                  !widget.existingItem!.photos
+                      .any((p) => p.imagePath == photo.imagePath))) {
+            final fileName =
+                '${DateTime.now().millisecondsSinceEpoch}_${i}_${widget.kitId}.jpg';
+            final savedImage = File('${appDir.path}/$fileName');
+            await File(photo.imagePath!).copy(savedImage.path);
+
+            // Replace with permanent path
+            processedPhotos[i] = ItemPhoto(
+              id: photo.id,
+              dateAdded: photo.dateAdded,
+              imagePath: savedImage.path,
+              caption: photo.caption,
+            );
+          }
+        }
+      }
+
+      // Create the item
       final item = RentalItem(
         id: widget.existingItem?.id,
         kitId: widget.kitId,
@@ -160,37 +309,19 @@ class _AddItemScreenState extends State<AddItemScreen> {
         category: _selectedCategory,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
         cost: cost,
+        photos: processedPhotos,
       );
 
-      // Save image to permanent location if needed
-      if (_imagePath != null &&
-          _imagePath != widget.existingItem?.imagePath &&
-          !kIsWeb) {
-        final appDir = await getApplicationDocumentsDirectory();
-        final fileName =
-            '${DateTime.now().millisecondsSinceEpoch}_${item.id}.jpg';
-        final savedImage = File('${appDir.path}/$fileName');
-        await File(_imagePath!).copy(savedImage.path);
-
-        // Update with permanent path
-        final updatedItem = RentalItem(
-          id: item.id,
-          kitId: item.kitId,
-          name: item.name,
-          dateAdded: item.dateAdded,
-          imagePath: savedImage.path,
-          imageDataUrl: item.imageDataUrl,
-          category: item.category,
-          notes: item.notes,
-          cost: item.cost,
-        );
-
-        await _item_repository.saveRentalItem(updatedItem);
-      } else {
-        await _item_repository.saveRentalItem(item);
+      await _itemRepository.saveRentalItem(item);
+      _currentItem = item;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
-
-      Navigator.of(context).pop();
     }
   }
 
@@ -201,6 +332,17 @@ class _AddItemScreenState extends State<AddItemScreen> {
         title: Text(widget.existingItem == null
             ? AppStrings.addItem
             : 'Edit ${widget.existingItem!.name}'),
+        actions: [
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -267,6 +409,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
                               _itemNameController.clear();
                             }
                           });
+                          _onFieldChanged();
                         },
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.zero,
@@ -322,63 +465,157 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
                     // Photo Section
                     const Text(
-                      'Item Photo (Optional)',
+                      'Item Photos (Max 3)',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
 
-                    // Display existing image if any
-                    if (_imagePath != null ||
-                        _imageDataUrl != null ||
-                        widget.existingItem?.imagePath != null ||
-                        widget.existingItem?.imageDataUrl != null)
-                      Container(
-                        width: double.infinity,
-                        height: 200,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: _imageHelper.buildItemImage(
-                          RentalItem(
-                            id: widget.existingItem?.id ?? 'temp',
-                            kitId: widget.kitId,
-                            name: _itemNameController.text,
-                            dateAdded: DateTime.now(),
-                            imagePath:
-                                _imagePath ?? widget.existingItem?.imagePath,
-                            imageDataUrl: _imageDataUrl ??
-                                widget.existingItem?.imageDataUrl,
+                    // Photo Grid
+                    if (_photos.isNotEmpty ||
+                        _imagePath != null ||
+                        _imageDataUrl != null)
+                      _buildPhotoGrid(),
+
+                    const SizedBox(height: 16),
+
+                    // Photo buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _photos.length < 3 ? _takePicture : null,
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Take Photo'),
                           ),
                         ),
-                      ),
-
-                    // Take photo button
-                    ElevatedButton.icon(
-                      onPressed: _takePicture,
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text(AppStrings.takePhoto),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _photos.length < 3 ? _pickPicture : null,
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Gallery'),
+                          ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 24),
-
-                    // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _saveItem,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: Text(
-                          widget.existingItem == null
-                              ? AppStrings.add
-                              : AppStrings.save,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
     );
+  }
+
+  Widget _buildPhotoGrid() {
+    // Combine legacy photo with new photos if needed
+    List<Widget> photoWidgets = [];
+
+    // Add legacy photo if exists and no new photos
+    if ((_imagePath != null || _imageDataUrl != null) && _photos.isEmpty) {
+      final legacyPhoto = ItemPhoto(
+        id: 'legacy',
+        imagePath: _imagePath,
+        imageDataUrl: _imageDataUrl,
+        dateAdded: DateTime.now(),
+      );
+
+      photoWidgets.add(_buildPhotoCard(legacyPhoto, 0));
+    }
+
+    // Add new photos
+    for (int i = 0; i < _photos.length; i++) {
+      photoWidgets.add(_buildPhotoCard(_photos[i], i));
+    }
+
+    return GridView.count(
+      crossAxisCount: 3,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: photoWidgets,
+    );
+  }
+
+  Widget _buildPhotoCard(ItemPhoto photo, int index) {
+    return Stack(
+      children: [
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: Builder(
+              builder: (context) {
+                try {
+                  if (photo.imagePath != null) {
+                    return Image.file(
+                      File(photo.imagePath!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.broken_image),
+                    );
+                  } else if (photo.imageDataUrl != null) {
+                    return Image.network(
+                      photo.imageDataUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.broken_image),
+                    );
+                  } else {
+                    return const Icon(Icons.image);
+                  }
+                } catch (e) {
+                  return const Icon(Icons.error);
+                }
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          top: 5,
+          right: 5,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 18),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                if (photo.id == 'legacy') {
+                  setState(() {
+                    _imagePath = null;
+                    _imageDataUrl = null;
+                    _saveItem();
+                  });
+                } else {
+                  _removePhoto(index);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Debouncer class for auto-save
+class Debouncer {
+  final int milliseconds;
+  Timer? _timer;
+
+  Debouncer({required this.milliseconds});
+
+  run(VoidCallback action) {
+    _timer?.cancel();
+    _timer = Timer(Duration(milliseconds: milliseconds), action);
   }
 }
