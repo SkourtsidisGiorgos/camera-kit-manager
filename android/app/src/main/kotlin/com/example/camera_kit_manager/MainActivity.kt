@@ -1,4 +1,4 @@
-package com.example.camera_kit_manager
+package com.viterby.camera_kit_manager
 
 import io.flutter.embedding.android.FlutterActivity
 
