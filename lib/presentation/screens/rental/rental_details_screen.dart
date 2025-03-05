@@ -1,17 +1,14 @@
-// Create a new file: lib/screens/rental_details_screen.dart
-import 'dart:io';
-import 'package:camera_kit_manager/data/kit_repository.dart';
+// lib/presentation/screens/rental/rental_details_screen.dart
+import 'package:camera_kit_manager/presentation/widgets/ui_components.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../domain/entities/rental.dart';
 import '../../../domain/entities/kit.dart';
 import '../../../data/rental_repository.dart';
+import '../../../data/kit_repository.dart';
 import '../../../data/item_repository.dart';
-import '../../../core/utils/constants.dart';
-import 'add_rental_screen.dart';
+import '../../widgets/common_widgets.dart';
 import '../kit/item_list_screen.dart';
+import 'add_rental_screen.dart';
 
 class RentalDetailsScreen extends StatefulWidget {
   final Rental rental;
@@ -94,21 +91,10 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
             itemCount: availableKits.length,
             itemBuilder: (context, index) {
               final kit = availableKits[index];
-              return ListTile(
-                title: Text(kit.name),
-                subtitle: Text(
-                  'Created: ${DateFormat('MMM d, yyyy').format(kit.dateCreated)}',
-                ),
-                leading: CircleAvatar(
-                  backgroundColor: kit.isOpen
-                      ? AppColors.openStatus
-                      : AppColors.closedStatus,
-                  child: Icon(
-                    kit.isOpen ? Icons.lock_open : Icons.lock,
-                    color: Colors.white,
-                  ),
-                ),
+              return KitListTile(
+                kit: kit,
                 onTap: () => Navigator.of(context).pop(kit),
+                actions: const [], // No actions needed here
               );
             },
           ),
@@ -129,44 +115,24 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
   }
 
   Future<void> _removeKit(Kit kit) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await ConfirmationDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Kit from Rental'),
-        content: Text(
-            'Are you sure you want to remove "${kit.name}" from this rental?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+      title: 'Remove Kit from Rental',
+      message:
+          'Are you sure you want to remove "${kit.name}" from this rental?',
+      confirmText: 'Remove',
+      isDangerous: true,
     );
 
-    if (confirm ?? false) {
+    if (confirm) {
       await _rentalRepository.removeKitFromRental(widget.rental.id, kit.id);
       _loadData();
     }
   }
 
   void _launchMaps() async {
-    if (widget.rental.latitude == null || widget.rental.longitude == null) {
-      return;
-    }
-
-    final url =
-        'https://www.google.com/maps/search/?api=1&query=${widget.rental.latitude},${widget.rental.longitude}';
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open maps')),
-      );
+    if (widget.rental.latitude != null && widget.rental.longitude != null) {
+      openMapsLink(context, widget.rental.latitude!, widget.rental.longitude!);
     }
   }
 
@@ -195,150 +161,36 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Rental info card
-                  Card(
-                    margin: const EdgeInsets.all(16),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (widget.rental.imagePath != null ||
-                              widget.rental.imageDataUrl != null)
-                            Container(
-                              width: double.infinity,
-                              height: 200,
-                              margin: const EdgeInsets.only(bottom: 16),
-                              child: _buildRentalImage(),
-                            ),
-                          Text(
-                            widget.rental.name,
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today, size: 16),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Start: ${DateFormat('MMM d, yyyy').format(widget.rental.startDate)}',
-                              ),
-                            ],
-                          ),
-                          if (widget.rental.endDate != null) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.event_available, size: 16),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'End: ${DateFormat('MMM d, yyyy').format(widget.rental.endDate!)}',
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (widget.rental.address != null) ...[
-                            const SizedBox(height: 8),
-                            InkWell(
-                              onTap: widget.rental.latitude != null
-                                  ? _launchMaps
-                                  : null,
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.location_on, size: 16),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      widget.rental.address!,
-                                      style: TextStyle(
-                                        color: widget.rental.latitude != null
-                                            ? Colors.blue
-                                            : null,
-                                        decoration:
-                                            widget.rental.latitude != null
-                                                ? TextDecoration.underline
-                                                : null,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          if (widget.rental.notes != null &&
-                              widget.rental.notes!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Notes:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(widget.rental.notes!),
-                          ],
-                        ],
-                      ),
-                    ),
+                  RentalInfoTile(
+                    rental: widget.rental,
+                    onMapTap: _launchMaps,
                   ),
 
                   // Total cost
-                  Card(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    color: AppColors.openStatusLight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Total Equipment Cost:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            '\$${_totalCost.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
+                  CostSummaryTile(totalCost: _totalCost),
+
+                  // Assigned kits section
+                  const SectionHeader(
+                    title: 'Assigned Equipment Kits',
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ElevatedButton.icon(
+                      onPressed: _assignKit,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Assign Kit'),
                     ),
                   ),
 
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Assigned Equipment Kits',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _assignKit,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Assign Kit'),
-                        ),
-                      ],
-                    ),
-                  ),
                   if (_assignedKits.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(
-                        child: Text('No equipment kits assigned yet'),
-                      ),
+                    const EmptyStateView(
+                      message: 'No equipment kits assigned yet',
                     )
                   else
                     ListView.builder(
@@ -347,28 +199,17 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
                       itemCount: _assignedKits.length,
                       itemBuilder: (context, index) {
                         final kit = _assignedKits[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                        return AppCard(
                           child: ListTile(
                             title: Text(kit.name),
                             subtitle: Text(
                               'Status: ${kit.isOpen ? "Open" : "Closed"}',
                             ),
-                            leading: CircleAvatar(
-                              backgroundColor: kit.isOpen
-                                  ? AppColors.openStatus
-                                  : AppColors.closedStatus,
-                              child: Icon(
-                                kit.isOpen ? Icons.lock_open : Icons.lock,
-                                color: Colors.white,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.visibility),
+                            leading: StatusBadge(isOpen: kit.isOpen),
+                            trailing: ActionButtons(
+                              actions: [
+                                ActionButton(
+                                  icon: Icons.visibility,
                                   onPressed: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
@@ -379,10 +220,10 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
                                   },
                                   tooltip: 'View Items',
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline,
-                                      color: Colors.red),
+                                ActionButton(
+                                  icon: Icons.remove_circle_outline,
                                   onPressed: () => _removeKit(kit),
+                                  color: Colors.red,
                                   tooltip: 'Remove from Rental',
                                 ),
                               ],
@@ -395,23 +236,5 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
               ),
             ),
     );
-  }
-
-  Widget _buildRentalImage() {
-    if (kIsWeb && widget.rental.imageDataUrl != null) {
-      return Image.network(
-        widget.rental.imageDataUrl!,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.broken_image, size: 100),
-      );
-    } else if (!kIsWeb && widget.rental.imagePath != null) {
-      return Image.file(
-        File(widget.rental.imagePath!),
-        fit: BoxFit.cover,
-      );
-    } else {
-      return const Center(child: Icon(Icons.image_not_supported, size: 100));
-    }
   }
 }
