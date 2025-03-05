@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:camera_kit_manager/core/utils/image_viewer_utils.dart';
+import 'package:camera_kit_manager/presentation/screens/common/image_viewer_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,6 +36,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
   final _categoryRepository = CategoryRepository();
   final _imageHelper = ImageHelper();
   final _debouncer = Debouncer(milliseconds: 500);
+  final _MAX_PHOTOS = 6;
 
   List<EquipmentCategory> _categories = [];
   List<String> _predefinedItems = [];
@@ -155,9 +158,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
   Future<void> _takePicture() async {
     try {
-      if (_photos.length >= 3) {
+      if (_photos.length >= _MAX_PHOTOS) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Maximum of 3 photos allowed per item')),
+          SnackBar(
+              content: Text('Maximum of $_MAX_PHOTOS photos allowed per item')),
         );
         return;
       }
@@ -200,9 +204,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
   Future<void> _pickPicture() async {
     try {
-      if (_photos.length >= 3) {
+      if (_photos.length >= _MAX_PHOTOS) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Maximum of 3 photos allowed per item')),
+          SnackBar(
+              content: Text('Maximum of $_MAX_PHOTOS photos allowed per item')),
         );
         return;
       }
@@ -464,8 +469,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
                     const SizedBox(height: 16),
 
                     // Photo Section
-                    const Text(
-                      'Item Photos (Max 3)',
+                    Text(
+                      'Item Photos (Max $_MAX_PHOTOS)',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -483,7 +488,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _photos.length < 3 ? _takePicture : null,
+                            onPressed: _photos.length < _MAX_PHOTOS
+                                ? _takePicture
+                                : null,
                             icon: const Icon(Icons.camera_alt),
                             label: const Text('Take Photo'),
                           ),
@@ -491,7 +498,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _photos.length < 3 ? _pickPicture : null,
+                            onPressed: _photos.length < _MAX_PHOTOS
+                                ? _pickPicture
+                                : null,
                             icon: const Icon(Icons.photo_library),
                             label: const Text('Gallery'),
                           ),
@@ -541,38 +550,59 @@ class _AddItemScreenState extends State<AddItemScreen> {
   Widget _buildPhotoCard(ItemPhoto photo, int index) {
     return Stack(
       children: [
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: Builder(
-              builder: (context) {
-                try {
-                  if (photo.imagePath != null) {
-                    return Image.file(
-                      File(photo.imagePath!),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.broken_image),
-                    );
-                  } else if (photo.imageDataUrl != null) {
-                    return Image.network(
-                      photo.imageDataUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.broken_image),
-                    );
-                  } else {
-                    return const Icon(Icons.image);
+        GestureDetector(
+          onTap: () {
+            // Create photo list for the gallery
+            List<ItemPhoto> photos =
+                _photos.isEmpty && (_imagePath != null || _imageDataUrl != null)
+                    ? [
+                        ItemPhoto(
+                          id: 'legacy',
+                          imagePath: _imagePath,
+                          imageDataUrl: _imageDataUrl,
+                          dateAdded: DateTime.now(),
+                        )
+                      ]
+                    : List.from(_photos);
+
+            ImageViewerUtils.openPhotoAtIndex(context, photos, index,
+                title: _itemNameController.text.isNotEmpty
+                    ? _itemNameController.text
+                    : 'Item Photo');
+          },
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Builder(
+                builder: (context) {
+                  try {
+                    if (photo.imagePath != null) {
+                      return Image.file(
+                        File(photo.imagePath!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.broken_image),
+                      );
+                    } else if (photo.imageDataUrl != null) {
+                      return Image.network(
+                        photo.imageDataUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.broken_image),
+                      );
+                    } else {
+                      return const Icon(Icons.image);
+                    }
+                  } catch (e) {
+                    return const Icon(Icons.error);
                   }
-                } catch (e) {
-                  return const Icon(Icons.error);
-                }
-              },
+                },
+              ),
             ),
           ),
         ),
@@ -602,6 +632,23 @@ class _AddItemScreenState extends State<AddItemScreen> {
             ),
           ),
         ),
+        // Optional: add a zoom indicator to help users understand the photo is tappable
+        // Positioned(
+        //   bottom: 5,
+        //   left: 5,
+        //   child: Container(
+        //     padding: const EdgeInsets.all(4),
+        //     decoration: BoxDecoration(
+        //       color: Colors.black.withOpacity(0.6),
+        //       borderRadius: BorderRadius.circular(4),
+        //     ),
+        //     child: const Icon(
+        //       Icons.zoom_in,
+        //       color: Colors.white,
+        //       size: 16,
+        //     ),
+        //   ),
+        // ),
       ],
     );
   }

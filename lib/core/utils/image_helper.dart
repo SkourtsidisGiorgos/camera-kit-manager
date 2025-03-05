@@ -49,11 +49,9 @@ class ImageHelper {
     );
   }
 
-  // Save photo and update the item
   Future<void> _addPhotoToItem(RentalItem item, XFile image) async {
-    // Check if already at max photos (3)
-    if (item.photos.length >= 3) {
-      throw Exception('Maximum of 3 photos allowed per item');
+    if (item.photos.length >= 6) {
+      throw Exception('Maximum of 6 photos allowed per item');
     }
 
     if (kIsWeb) {

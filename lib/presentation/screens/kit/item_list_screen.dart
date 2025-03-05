@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:camera_kit_manager/core/utils/image_viewer_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../domain/entities/kit.dart';
@@ -313,7 +314,7 @@ class _ItemListScreenState extends State<ItemListScreen> {
                       },
                     ),
                   );
-                }).toList(),
+                }),
 
                 // Clear filters button
                 if (_selectedCategory != null ||
@@ -442,80 +443,116 @@ class _ItemListScreenState extends State<ItemListScreen> {
       );
     }
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Builder(
-        builder: (context) {
-          try {
-            if (item.photos.isNotEmpty) {
-              // Use the first photo from the photos list
-              final photo = item.photos.first;
-              if (photo.imagePath != null) {
-                return Image.file(
-                  File(photo.imagePath!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    debugPrint('Error loading image: $error');
-                    return Icon(Icons.broken_image,
-                        color: Colors.grey.shade400, size: size * 0.5);
-                  },
-                );
-              } else if (photo.imageDataUrl != null) {
-                return Image.network(
-                  photo.imageDataUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    debugPrint('Error loading image: $error');
-                    return Icon(Icons.broken_image,
-                        color: Colors.grey.shade400, size: size * 0.5);
-                  },
-                );
-              }
-            } else if (item.imagePath != null) {
-              // Legacy image path support
-              return Image.file(
-                File(item.imagePath!),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  debugPrint('Error loading image: $error');
-                  return Icon(Icons.broken_image,
-                      color: Colors.grey.shade400, size: size * 0.5);
-                },
-              );
-            } else if (item.imageDataUrl != null) {
-              // Legacy image URL support
-              return Image.network(
-                item.imageDataUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  debugPrint('Error loading image: $error');
-                  return Icon(Icons.broken_image,
-                      color: Colors.grey.shade400, size: size * 0.5);
-                },
-              );
-            }
+    return GestureDetector(
+      onTap: () => ImageViewerUtils.openItemPhotos(context, item),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Same image loading code as you had before
+            Builder(builder: (context) {
+              try {
+                if (item.photos.isNotEmpty) {
+                  // Use the first photo from the photos list
+                  final photo = item.photos.first;
+                  if (photo.imagePath != null) {
+                    return Image.file(
+                      File(photo.imagePath!),
+                      fit: BoxFit.cover,
+                      width: size,
+                      height: size,
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('Error loading image: $error');
+                        return Icon(Icons.broken_image,
+                            color: Colors.grey.shade400, size: size * 0.5);
+                      },
+                    );
+                  } else if (photo.imageDataUrl != null) {
+                    return Image.network(
+                      photo.imageDataUrl!,
+                      fit: BoxFit.cover,
+                      width: size,
+                      height: size,
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('Error loading image: $error');
+                        return Icon(Icons.broken_image,
+                            color: Colors.grey.shade400, size: size * 0.5);
+                      },
+                    );
+                  }
+                } else if (item.imagePath != null) {
+                  // Legacy image path support
+                  return Image.file(
+                    File(item.imagePath!),
+                    fit: BoxFit.cover,
+                    width: size,
+                    height: size,
+                    errorBuilder: (context, error, stackTrace) {
+                      debugPrint('Error loading image: $error');
+                      return Icon(Icons.broken_image,
+                          color: Colors.grey.shade400, size: size * 0.5);
+                    },
+                  );
+                } else if (item.imageDataUrl != null) {
+                  // Legacy image URL support
+                  return Image.network(
+                    item.imageDataUrl!,
+                    fit: BoxFit.cover,
+                    width: size,
+                    height: size,
+                    errorBuilder: (context, error, stackTrace) {
+                      debugPrint('Error loading image: $error');
+                      return Icon(Icons.broken_image,
+                          color: Colors.grey.shade400, size: size * 0.5);
+                    },
+                  );
+                }
 
-            // Fallback if no image could be loaded
-            return Icon(Icons.photo,
-                color: Colors.grey.shade400, size: size * 0.5);
-          } catch (e) {
-            debugPrint('Error in thumbnail builder: $e');
-            return Icon(Icons.error,
-                color: Colors.grey.shade400, size: size * 0.5);
-          }
-        },
+                // Fallback if no image could be loaded
+                return Icon(Icons.photo,
+                    color: Colors.grey.shade400, size: size * 0.5);
+              } catch (e) {
+                debugPrint('Error in thumbnail builder: $e');
+                return Icon(Icons.error,
+                    color: Colors.grey.shade400, size: size * 0.5);
+              }
+            }),
+
+            // Add a small indicator if there are multiple photos
+            if (item.photos.length > 1)
+              Positioned(
+                right: 4,
+                bottom: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${item.photos.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
