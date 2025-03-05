@@ -1,4 +1,3 @@
-// Create a new file: lib/models/rental.dart
 import 'package:hive_flutter/hive_flutter.dart';
 
 part 'rental.g.dart';

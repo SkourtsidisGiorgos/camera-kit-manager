@@ -1,36 +1,30 @@
-// In main.dart, update main() and MyApp
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'models/kit.dart';
-import 'models/rental_item.dart';
-import 'models/equipment_category.dart';
-import 'models/rental.dart';
-import 'screens/kit/kit_list_screen.dart';
-import 'screens/rental/rental_list_screen.dart';
-import 'screens/settings/backup_settings_screen.dart';
-import 'screens/settings/settings_screen.dart';
-import 'utils/constants.dart';
+import 'domain/entities/kit.dart';
+import 'domain/entities/rental_item.dart';
+import 'domain/entities/equipment_category.dart';
+import 'domain/entities/rental.dart';
+import 'presentation/screens/kit/kit_list_screen.dart';
+import 'presentation/screens/rental/rental_list_screen.dart';
+import 'presentation/screens/settings/backup_settings_screen.dart';
+import 'presentation/screens/settings/settings_screen.dart';
+import 'core/utils/constants.dart';
 import 'data/category_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive for all platforms
   await Hive.initFlutter();
-
-  // Register adapters
   Hive.registerAdapter(KitAdapter());
   Hive.registerAdapter(RentalItemAdapter());
   Hive.registerAdapter(EquipmentCategoryAdapter());
   Hive.registerAdapter(RentalAdapter());
 
-  // Open boxes
   await Hive.openBox<Kit>('kits');
   await Hive.openBox<RentalItem>('rentalItems');
   await Hive.openBox<EquipmentCategory>('equipmentCategories');
   await Hive.openBox<Rental>('rentals');
 
-  // Initialize default categories
   final categoryRepository = CategoryRepository();
   await categoryRepository.initDefaultCategoriesIfEmpty();
 
@@ -64,13 +58,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  // Screen titles
   final List<String> _titles = [
     AppStrings.appTitle,
     'Camera Kit Manager',
   ];
 
-  // Screen widgets
   final _screens = [
     const KitListScreen(),
     const RentalListScreen(),

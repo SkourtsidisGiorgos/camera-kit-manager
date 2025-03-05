@@ -6,8 +6,8 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:http/io_client.dart';
-import '../utils/constants.dart';
-import '../services/backup_service.dart';
+import '../../core/utils/constants.dart';
+import 'backup_service.dart';
 
 class GoogleDriveService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -72,7 +72,7 @@ class GoogleDriveService {
       // Check if app folder exists, create if it doesn't
       final folderName = AppStrings.appTitle;
       String? folderId = await _getFolderIdByName(driveApi, folderName);
-      
+
       if (folderId == null) {
         folderId = await _createFolder(driveApi, folderName);
       }
@@ -81,7 +81,8 @@ class GoogleDriveService {
       final fileMetadata = drive.File(
         name: fileName,
         parents: [folderId!],
-        description: 'Camera Kit Manager Backup - ${DateTime.now().toIso8601String()}',
+        description:
+            'Camera Kit Manager Backup - ${DateTime.now().toIso8601String()}',
         mimeType: 'application/octet-stream',
       );
 
@@ -122,13 +123,13 @@ class GoogleDriveService {
       // Save to temp file
       final directory = await getTemporaryDirectory();
       final localFile = File('${directory.path}/$fileName');
-      
+
       List<int> dataStore = [];
       await for (var data in media.stream) {
         dataStore.addAll(data);
       }
       await localFile.writeAsBytes(dataStore);
-      
+
       return localFile;
     } catch (e) {
       debugPrint('Error downloading from Google Drive: $e');
@@ -145,7 +146,7 @@ class GoogleDriveService {
       // Find app folder
       final folderName = AppStrings.appTitle;
       String? folderId = await _getFolderIdByName(driveApi, folderName);
-      
+
       if (folderId == null) {
         return [];
       }
@@ -157,10 +158,12 @@ class GoogleDriveService {
         $fields: 'files(id, name, modifiedTime, size)',
       );
 
-      return fileList.files?.where((file) => 
-        file.name?.endsWith('.json') == true || 
-        file.name?.endsWith('.zip') == true
-      ).toList() ?? [];
+      return fileList.files
+              ?.where((file) =>
+                  file.name?.endsWith('.json') == true ||
+                  file.name?.endsWith('.zip') == true)
+              .toList() ??
+          [];
     } catch (e) {
       debugPrint('Error fetching backup files: $e');
       return [];
@@ -168,7 +171,8 @@ class GoogleDriveService {
   }
 
   // Get or create app folder ID
-  Future<String?> _getFolderIdByName(drive.DriveApi driveApi, String folderName) async {
+  Future<String?> _getFolderIdByName(
+      drive.DriveApi driveApi, String folderName) async {
     try {
       final result = await driveApi.files.list(
         q: "mimeType='application/vnd.google-apps.folder' and name='$folderName' and trashed = false",
@@ -186,7 +190,8 @@ class GoogleDriveService {
   }
 
   // Create folder in Google Drive
-  Future<String?> _createFolder(drive.DriveApi driveApi, String folderName) async {
+  Future<String?> _createFolder(
+      drive.DriveApi driveApi, String folderName) async {
     try {
       final folder = drive.File(
         name: folderName,

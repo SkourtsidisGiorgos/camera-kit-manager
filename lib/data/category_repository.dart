@@ -1,4 +1,4 @@
-import 'package:camera_kit_manager/models/equipment_category.dart';
+import 'package:camera_kit_manager/domain/entities/equipment_category.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class CategoryRepository {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../utils/constants.dart';
+import '../../../core/utils/constants.dart';
 import 'backup_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {

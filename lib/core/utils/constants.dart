@@ -9,10 +9,8 @@ class AppColors {
 }
 
 class AppStrings {
-  // App title
   static const String appTitle = 'Camera Kit Manager';
 
-  // General
   static const String cancel = 'Cancel';
   static const String create = 'Create';
   static const String add = 'Add';

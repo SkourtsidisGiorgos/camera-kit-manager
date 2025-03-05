@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import '../models/rental_item.dart';
-import '../data/item_repository.dart';
+import '../../domain/entities/rental_item.dart';
+import '../../data/item_repository.dart';
 
 class ImageHelper {
   final ImagePicker _imagePicker = ImagePicker();

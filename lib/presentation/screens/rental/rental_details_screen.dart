@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../models/rental.dart';
-import '../../models/kit.dart';
-import '../../data/rental_repository.dart';
-import '../../data/item_repository.dart';
-import '../../utils/constants.dart';
+import '../../../domain/entities/rental.dart';
+import '../../../domain/entities/kit.dart';
+import '../../../data/rental_repository.dart';
+import '../../../data/item_repository.dart';
+import '../../../core/utils/constants.dart';
 import 'add_rental_screen.dart';
 import '../kit/item_list_screen.dart';
 

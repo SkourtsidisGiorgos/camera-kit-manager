@@ -1,6 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/rental.dart';
-import '../models/kit.dart';
+import '../domain/entities/rental.dart';
+import '../domain/entities/kit.dart';
 
 class RentalRepository {
   Future<void> saveRental(Rental rental) async {

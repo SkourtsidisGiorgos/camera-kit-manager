@@ -1,16 +1,16 @@
 import 'package:camera_kit_manager/data/category_repository.dart';
-import 'package:camera_kit_manager/screens/kit/add_item_screen.dart';
+import 'package:camera_kit_manager/presentation/screens/kit/add_item_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
-import '../../models/kit.dart';
-import '../../models/rental_item.dart';
-import '../../data/item_repository.dart';
-import '../../utils/constants.dart';
-import '../../utils/image_helper.dart';
+import '../../../domain/entities/kit.dart';
+import '../../../domain/entities/rental_item.dart';
+import '../../../data/item_repository.dart';
+import '../../../core/utils/constants.dart';
+import '../../../core/utils/image_helper.dart';
 
 class ItemListScreen extends StatefulWidget {
   final Kit kit;

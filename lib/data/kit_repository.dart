@@ -1,5 +1,5 @@
-import 'package:camera_kit_manager/models/kit.dart';
-import 'package:camera_kit_manager/models/rental_item.dart';
+import 'package:camera_kit_manager/domain/entities/kit.dart';
+import 'package:camera_kit_manager/domain/entities/rental_item.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class KitRepository {

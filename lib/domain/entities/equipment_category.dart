@@ -20,7 +20,6 @@ class EquipmentCategory {
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 }
 
-// Predefined equipment categories with common items
 class EquipmentCategories {
   static final List<EquipmentCategory> defaultCategories = [
     EquipmentCategory(
