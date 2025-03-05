@@ -127,7 +127,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(),
 
-                // About
                 const ListTile(
                   title: Text(
                     'About',
@@ -154,7 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: const Text('Terms of Service'),
                         content: const SingleChildScrollView(
                           child: Text(
-                            'This is a placeholder for the Terms of Service. Replace with your actual terms.',
+                            'This is a placeholder for the Terms of Service.',
                           ),
                         ),
                         actions: [
@@ -171,14 +170,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Privacy Policy'),
                   leading: const Icon(Icons.privacy_tip),
                   onTap: () {
-                    // Show privacy policy dialog or navigate to privacy screen
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text('Privacy Policy'),
                         content: const SingleChildScrollView(
                           child: Text(
-                            'This is a placeholder for the Privacy Policy. Replace with your actual policy.',
+                            "Camera Kit Manager does not collect, store, analyze or share any user data. We currently don't do analytics",
                           ),
                         ),
                         actions: [
@@ -191,12 +189,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   },
                 ),
-                // Credits section
                 const AboutListTile(
                   icon: Icon(Icons.info),
                   applicationName: AppStrings.appTitle,
                   applicationVersion: 'Version 1.0.0',
-                  applicationLegalese: '© 2023 Your Company',
+                  applicationLegalese: '© 2025 Viterby Solutions',
                   aboutBoxChildren: [
                     SizedBox(height: 10),
                     Text(
