@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "118094697619",
+    "project_id": "camera-kit-manager-89acd",
+    "storage_bucket": "camera-kit-manager-89acd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118094697619:android:0df95814bf78a0352f6966",
+        "android_client_info": {
+          "package_name": "com.viterby.cameraKitManager"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "118094697619-dl8lorqpb2qsg9q52dd7k2hgje098htk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.viterby.cameraKitManager",
+            "certificate_hash": "8642b510e3f486cdeefec4a820ef5eac6d283d5a"
+          }
+        },
+        {
+          "client_id": "118094697619-d82ubs3fso7hro5afik0te7uh51nnc8t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBVtq8McPekM87Kkq8cffHCJIZsEWZnXY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "118094697619-d82ubs3fso7hro5afik0te7uh51nnc8t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,1 @@
+/home/gskourts/opt/projects/flutter/camera_kit_manager/build/app/intermediates/cxx/Debug/492o3l6k/obj/x86_64

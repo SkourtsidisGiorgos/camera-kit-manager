@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Camera Kit Manager</string>
+    <!-- Web client ID from Firebase console -->
+    <string name="web_client_id">118094697619-d82ubs3fso7hro5afik0te7uh51nnc8t.apps.googleusercontent.com</string>
+</resources>
