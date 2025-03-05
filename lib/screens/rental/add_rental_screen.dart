@@ -6,8 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:geocoding/geocoding.dart';
-import '../models/rental.dart';
-import '../data/rental_repository.dart';
+import '../../models/rental.dart';
+import '../../data/rental_repository.dart';
 import 'location_picker_screen.dart';
 
 class AddRentalScreen extends StatefulWidget {

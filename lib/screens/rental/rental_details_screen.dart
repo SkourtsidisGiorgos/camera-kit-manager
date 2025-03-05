@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/rental.dart';
-import '../models/kit.dart';
-import '../data/rental_repository.dart';
-import '../data/item_repository.dart';
-import '../utils/constants.dart';
+import '../../models/rental.dart';
+import '../../models/kit.dart';
+import '../../data/rental_repository.dart';
+import '../../data/item_repository.dart';
+import '../../utils/constants.dart';
 import 'add_rental_screen.dart';
-import 'item_list_screen.dart';
+import '../kit/item_list_screen.dart';
 
 class RentalDetailsScreen extends StatefulWidget {
   final Rental rental;

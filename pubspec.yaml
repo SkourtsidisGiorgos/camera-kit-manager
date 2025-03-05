@@ -21,9 +21,16 @@ dependencies:
   collection: ^1.18.0  
   # win32: 5.0.7 
   google_maps_flutter: ^2.2.6
-  geocoding: ^2.1.0
-  geolocator: ^9.0.2
+  geocoding: ^3.0.0
+  geolocator: ^13.0.2
   url_launcher: ^6.1.10
+  google_sign_in: ^6.1.4
+  googleapis: ^13.2.0
+  http: ^1.1.0
+  archive: ^4.0.4
+  file_picker: ^9.0.2
+  shared_preferences: ^2.2.0
+  package_info_plus: ^8.3.0  
 
 dev_dependencies:
   flutter_test:

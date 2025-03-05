@@ -1,11 +1,11 @@
 import 'package:camera_kit_manager/data/kit_repository.dart';
-import 'package:camera_kit_manager/screens/item_list_screen.dart';
+import 'package:camera_kit_manager/screens/kit/item_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/kit.dart';
-import '../models/rental.dart';
-import '../data/rental_repository.dart';
-import '../utils/constants.dart';
+import '../../models/kit.dart';
+import '../../models/rental.dart';
+import '../../data/rental_repository.dart';
+import '../../utils/constants.dart';
 
 class KitListScreen extends StatefulWidget {
   const KitListScreen({super.key});
