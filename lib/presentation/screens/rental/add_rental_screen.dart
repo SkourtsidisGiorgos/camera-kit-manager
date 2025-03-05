@@ -1,13 +1,13 @@
-// Create a new file: lib/screens/add_rental_screen.dart
+// lib/presentation/screens/rental/add_rental_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../../domain/entities/rental.dart';
 import '../../../data/rental_repository.dart';
+import '../../widgets/ui_components.dart';
+import '../../widgets/common_widgets.dart';
 import 'location_picker_screen.dart';
 
 class AddRentalScreen extends StatefulWidget {
@@ -28,7 +28,7 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
   final _repository = RentalRepository();
-  final _imagePicker = ImagePicker();
+  final _imagePicker = ImagePickerHelper();
 
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
@@ -136,12 +136,7 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
 
   Future<void> _takePicture() async {
     try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
+      final image = await _imagePicker.takePicture();
 
       if (image != null) {
         setState(() {
@@ -228,19 +223,11 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Rental Name
-              TextFormField(
+              AppFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Rental Name',
-                  hintText: 'Enter rental client or project name',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a name';
-                  }
-                  return null;
-                },
+                label: 'Rental Name',
+                hint: 'Enter rental client or project name',
+                required: true,
               ),
 
               const SizedBox(height: 16),
@@ -249,20 +236,17 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: ListTile(
-                      title: const Text('Start Date'),
-                      subtitle:
-                          Text(DateFormat('MMM d, yyyy').format(_startDate)),
-                      onTap: () => _selectStartDate(context),
+                    child: DatePickerField(
+                      label: 'Start Date',
+                      date: _startDate,
+                      onTap: _selectStartDate,
                     ),
                   ),
                   Expanded(
-                    child: ListTile(
-                      title: const Text('End Date'),
-                      subtitle: _endDate != null
-                          ? Text(DateFormat('MMM d, yyyy').format(_endDate!))
-                          : const Text('Not set'),
-                      onTap: () => _selectEndDate(context),
+                    child: DatePickerField(
+                      label: 'End Date',
+                      date: _endDate,
+                      onTap: _selectEndDate,
                     ),
                   ),
                 ],
@@ -271,76 +255,31 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
               const SizedBox(height: 16),
 
               // Location
-              TextFormField(
+              LocationPickerField(
                 controller: _addressController,
-                decoration: InputDecoration(
-                  labelText: 'Address',
-                  hintText: 'Enter location address',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _geocodeAddress,
-                    tooltip: 'Find location',
-                  ),
-                ),
+                latitude: _latitude,
+                longitude: _longitude,
+                onPickLocation: _pickLocation,
+                onGeocodeAddress: _geocodeAddress,
               ),
-
-              const SizedBox(height: 8),
-
-              // Map button
-              ElevatedButton.icon(
-                onPressed: _pickLocation,
-                icon: const Icon(Icons.map),
-                label: const Text('Pick Location on Map'),
-              ),
-
-              // Display location coordinates if available
-              if (_latitude != null && _longitude != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Location: ${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
 
               const SizedBox(height: 16),
 
               // Photo Section
-              const Text(
-                'Rental Photo (Optional)',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-
-              // Display existing image if any
-              if (_imagePath != null ||
-                  _imageDataUrl != null ||
-                  widget.existingRental?.imagePath != null ||
-                  widget.existingRental?.imageDataUrl != null)
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: _buildRentalImage(),
-                ),
-
-              // Take photo button
-              ElevatedButton.icon(
-                onPressed: _takePicture,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Take Photo'),
+              ImagePickerField(
+                imagePath: _imagePath,
+                imageDataUrl: _imageDataUrl,
+                onPickImage: _takePicture,
+                label: 'Rental Photo (Optional)',
               ),
 
               const SizedBox(height: 16),
 
               // Notes
-              TextFormField(
+              AppFormField(
                 controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (Optional)',
-                  hintText: 'Additional information about the rental',
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Notes (Optional)',
+                hint: 'Additional information about the rental',
                 maxLines: 3,
               ),
 
@@ -367,41 +306,5 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildRentalImage() {
-    if (kIsWeb) {
-      // For web platform
-      if (_imageDataUrl != null) {
-        return Image.network(
-          _imageDataUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.broken_image, size: 100),
-        );
-      } else if (widget.existingRental?.imageDataUrl != null) {
-        return Image.network(
-          widget.existingRental!.imageDataUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.broken_image, size: 100),
-        );
-      }
-    } else {
-      // For mobile platform
-      if (_imagePath != null) {
-        return Image.file(
-          File(_imagePath!),
-          fit: BoxFit.cover,
-        );
-      } else if (widget.existingRental?.imagePath != null) {
-        return Image.file(
-          File(widget.existingRental!.imagePath!),
-          fit: BoxFit.cover,
-        );
-      }
-    }
-
-    return const Icon(Icons.image, size: 100);
   }
 }
