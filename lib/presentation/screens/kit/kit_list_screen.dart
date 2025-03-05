@@ -1,11 +1,12 @@
-import 'package:camera_kit_manager/data/kit_repository.dart';
-import 'package:camera_kit_manager/presentation/screens/kit/item_list_screen.dart';
+import 'package:camera_kit_manager/presentation/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../domain/entities/kit.dart';
 import '../../../domain/entities/rental.dart';
+import '../../../data/kit_repository.dart';
 import '../../../data/rental_repository.dart';
 import '../../../core/utils/constants.dart';
+import '../../widgets/ui_components.dart';
+import 'item_list_screen.dart';
 
 class KitListScreen extends StatefulWidget {
   const KitListScreen({super.key});
@@ -106,18 +107,11 @@ class _KitListScreenState extends State<KitListScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextFormField(
+                    AppFormField(
                       controller: _kitNameController,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.kitName,
-                        hintText: AppStrings.kitNameHint,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return AppStrings.kitNameValidator;
-                        }
-                        return null;
-                      },
+                      label: AppStrings.kitName,
+                      hint: AppStrings.kitNameHint,
+                      required: true,
                     ),
                     const SizedBox(height: 16),
 
@@ -181,18 +175,11 @@ class _KitListScreenState extends State<KitListScreen> {
         title: const Text('Edit Kit'),
         content: Form(
           key: _formKey,
-          child: TextFormField(
+          child: AppFormField(
             controller: _kitNameController,
-            decoration: const InputDecoration(
-              labelText: AppStrings.kitName,
-              hintText: AppStrings.kitNameHint,
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return AppStrings.kitNameValidator;
-              }
-              return null;
-            },
+            label: AppStrings.kitName,
+            hint: AppStrings.kitNameHint,
+            required: true,
           ),
         ),
         actions: [
@@ -225,108 +212,50 @@ class _KitListScreenState extends State<KitListScreen> {
     }
   }
 
+  Future<void> _deleteKit(Kit kit) async {
+    final confirm = await ConfirmationDialog.show(
+      context: context,
+      title: AppStrings.deleteKit,
+      message:
+          'Are you sure you want to delete "${kit.name}"? ${AppStrings.deleteKitConfirm}',
+      confirmText: AppStrings.delete,
+      isDangerous: true,
+    );
+
+    if (confirm) {
+      await _kitRepository.deleteKit(kit.id);
+      _refreshKits();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : _kits.isEmpty
-              ? Center(
-                  child: Text(
-                    AppStrings.noKits,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
+              ? const EmptyStateView(
+                  message: AppStrings.noKits,
+                  icon: Icons.camera,
                 )
               : ListView.builder(
                   itemCount: _kits.length,
                   itemBuilder: (context, index) {
                     final kit = _kits[index];
-                    final formattedDate =
-                        DateFormat('MMM d, yyyy').format(kit.dateCreated);
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: Text(kit.name),
-                        subtitle: Text('Created: $formattedDate'),
-                        leading: CircleAvatar(
-                          backgroundColor: kit.isOpen
-                              ? AppColors.openStatus
-                              : AppColors.closedStatus,
-                          child: Icon(
-                            kit.isOpen ? Icons.lock_open : Icons.lock,
-                            color: Colors.white,
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _showEditKitDialog(kit),
-                              tooltip: 'Edit Kit',
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                kit.isOpen ? Icons.lock : Icons.lock_open,
-                                color: kit.isOpen
-                                    ? AppColors.closedStatus
-                                    : AppColors.openStatus,
+                    return KitListTile.withDefaultActions(
+                      kit: kit,
+                      onTap: () {
+                        Navigator.of(context)
+                            .push(
+                              MaterialPageRoute(
+                                builder: (context) => ItemListScreen(kit: kit),
                               ),
-                              onPressed: () => _toggleKitStatus(kit),
-                              tooltip: kit.isOpen
-                                  ? AppStrings.closeKit
-                                  : AppStrings.reopenKit,
-                            ),
-                            IconButton(
-                              icon:
-                                  const Icon(Icons.delete, color: Colors.grey),
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text(AppStrings.deleteKit),
-                                    content: Text(
-                                        'Are you sure you want to delete "${kit.name}"? ${AppStrings.deleteKitConfirm}'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(false),
-                                        child: const Text(AppStrings.cancel),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(true),
-                                        child: const Text(AppStrings.delete,
-                                            style:
-                                                TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-
-                                if (confirm ?? false) {
-                                  await _kitRepository.deleteKit(kit.id);
-                                  _refreshKits();
-                                }
-                              },
-                              tooltip: AppStrings.delete,
-                            ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.of(context)
-                              .push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      ItemListScreen(kit: kit),
-                                ),
-                              )
-                              .then((_) => _refreshKits());
-                        },
-                      ),
+                            )
+                            .then((_) => _refreshKits());
+                      },
+                      onEdit: () => _showEditKitDialog(kit),
+                      onToggleStatus: () => _toggleKitStatus(kit),
+                      onDelete: () => _deleteKit(kit),
                     );
                   },
                 ),
