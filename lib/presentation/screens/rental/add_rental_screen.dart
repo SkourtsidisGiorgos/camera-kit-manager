@@ -157,7 +157,7 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
 
   Future<void> _saveRental() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // Create rental object
+      // Create rental object with existing ID if editing
       final rental = Rental(
         id: widget.existingRental?.id,
         name: _nameController.text,
@@ -173,7 +173,7 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
         kitIds: widget.existingRental?.kitIds,
       );
 
-      // Save image to permanent location if needed
+      // Handle image saving if needed
       if (_imagePath != null &&
           _imagePath != widget.existingRental?.imagePath &&
           !kIsWeb) {
@@ -203,7 +203,8 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
         await _repository.saveRental(rental);
       }
 
-      Navigator.of(context).pop();
+      // Return true to indicate successful save
+      Navigator.of(context).pop(true);
     }
   }
 

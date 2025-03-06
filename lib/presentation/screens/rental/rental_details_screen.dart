@@ -147,15 +147,28 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
     }
   }
 
-  void _editRental() {
-    Navigator.of(context)
-        .push(
+  void _editRental() async {
+    // Navigate to edit screen and wait for result
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AddRentalScreen(existingRental: widget.rental),
+      ),
+    );
+
+    if (result == true) {
+      // Get the updated rental data from the repository
+      final updatedRental =
+          await _rentalRepository.getRentalById(widget.rental.id);
+
+      if (updatedRental != null && mounted) {
+        // Replace the current screen with a fresh instance
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) =>
-                AddRentalScreen(existingRental: widget.rental),
+            builder: (context) => RentalDetailsScreen(rental: updatedRental),
           ),
-        )
-        .then((_) => _loadData());
+        );
+      }
+    }
   }
 
   @override
