@@ -31,6 +31,9 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
   bool _isLoading = true;
   double _totalCost = 0.0;
 
+  // Store individual kit costs
+  Map<String, double> _kitCosts = {};
+
   @override
   void initState() {
     super.initState();
@@ -47,21 +50,29 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
     final assignedKits =
         await _rentalRepository.getKitsByRental(widget.rental.id);
 
-    // Calculate total cost
+    // Calculate total cost and individual kit costs
     double total = 0.0;
+    Map<String, double> kitCosts = {};
+
     for (var kit in assignedKits) {
       final items = await _itemRepository.getRentalItemsByKitId(kit.id);
+      double kitTotal = 0.0;
+
       for (var item in items) {
         if (item.cost != null) {
-          total += item.cost!;
+          kitTotal += item.cost!;
         }
       }
+
+      kitCosts[kit.id] = kitTotal;
+      total += kitTotal;
     }
 
     setState(() {
       _kits = allKits;
       _assignedKits = assignedKits;
       _totalCost = total;
+      _kitCosts = kitCosts;
       _isLoading = false;
     });
   }
@@ -172,8 +183,11 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
                     onMapTap: _launchMaps,
                   ),
 
-                  // Total cost
-                  CostSummaryTile(totalCost: _totalCost),
+                  // Total cost summary for all kits
+                  CostSummaryTile(
+                    totalCost: _totalCost,
+                    title: 'Total Equipment Cost:',
+                  ),
 
                   // Assigned kits section
                   const SectionHeader(
@@ -199,42 +213,63 @@ class _RentalDetailsScreenState extends State<RentalDetailsScreen> {
                       itemCount: _assignedKits.length,
                       itemBuilder: (context, index) {
                         final kit = _assignedKits[index];
-                        return AppCard(
-                          child: ListTile(
-                            title: Text(kit.name),
-                            subtitle: Text(
-                              'Status: ${kit.isOpen ? "Open" : "Closed"}',
-                            ),
-                            leading: StatusBadge(isOpen: kit.isOpen),
-                            trailing: ActionButtons(
-                              actions: [
-                                ActionButton(
-                                  icon: Icons.visibility,
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            ItemListScreen(kit: kit),
-                                      ),
-                                    );
-                                  },
-                                  tooltip: 'View Items',
-                                ),
-                                ActionButton(
-                                  icon: Icons.remove_circle_outline,
-                                  onPressed: () => _removeKit(kit),
-                                  color: Colors.red,
-                                  tooltip: 'Remove from Rental',
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                        return _buildKitCard(kit);
                       },
                     ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildKitCard(Kit kit) {
+    final kitCost = _kitCosts[kit.id] ?? 0.0;
+
+    return AppCard(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(kit.name),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Status: ${kit.isOpen ? "Open" : "Closed"}'),
+                Text(
+                  'Cost: \$${kitCost.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ],
+            ),
+            leading: StatusBadge(isOpen: kit.isOpen),
+            trailing: ActionButtons(
+              actions: [
+                ActionButton(
+                  icon: Icons.visibility,
+                  onPressed: () {
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (context) => ItemListScreen(kit: kit),
+                          ),
+                        )
+                        .then((_) => _loadData());
+                  },
+                  tooltip: 'View Items',
+                ),
+                ActionButton(
+                  icon: Icons.remove_circle_outline,
+                  onPressed: () => _removeKit(kit),
+                  color: Colors.red,
+                  tooltip: 'Remove from Rental',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import '../../../domain/entities/kit.dart';
 import '../../../domain/entities/rental.dart';
 import '../../../data/kit_repository.dart';
 import '../../../data/rental_repository.dart';
+import '../../../data/item_repository.dart';
 import '../../../core/utils/constants.dart';
 import '../../widgets/ui_components.dart';
 import 'item_list_screen.dart';
@@ -20,10 +21,12 @@ class _KitListScreenState extends State<KitListScreen> {
   final _kitNameController = TextEditingController();
   final _kitRepository = KitRepository();
   final _rentalRepository = RentalRepository();
+  final _itemRepository = ItemRepository();
   List<Kit> _kits = [];
   List<Rental> _rentals = [];
   Rental? _selectedRental;
   bool _isLoading = true;
+  Map<String, double> _kitCosts = {};
 
   @override
   void initState() {
@@ -40,8 +43,23 @@ class _KitListScreenState extends State<KitListScreen> {
   Future<void> _refreshKits() async {
     setState(() => _isLoading = true);
     final kits = await _kitRepository.getAllKits();
+
+    // Calculate cost for each kit
+    Map<String, double> kitCosts = {};
+    for (var kit in kits) {
+      final items = await _itemRepository.getRentalItemsByKitId(kit.id);
+      double totalCost = 0.0;
+      for (var item in items) {
+        if (item.cost != null) {
+          totalCost += item.cost!;
+        }
+      }
+      kitCosts[kit.id] = totalCost;
+    }
+
     setState(() {
       _kits = kits..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+      _kitCosts = kitCosts;
       _isLoading = false;
     });
   }
@@ -242,27 +260,88 @@ class _KitListScreenState extends State<KitListScreen> {
                   itemCount: _kits.length,
                   itemBuilder: (context, index) {
                     final kit = _kits[index];
-                    return KitListTile.withDefaultActions(
-                      kit: kit,
-                      onTap: () {
-                        Navigator.of(context)
-                            .push(
-                              MaterialPageRoute(
-                                builder: (context) => ItemListScreen(kit: kit),
-                              ),
-                            )
-                            .then((_) => _refreshKits());
-                      },
-                      onEdit: () => _showEditKitDialog(kit),
-                      onToggleStatus: () => _toggleKitStatus(kit),
-                      onDelete: () => _deleteKit(kit),
-                    );
+                    return _buildKitTile(kit);
                   },
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddKitDialog,
         tooltip: 'Add New Kit',
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildKitTile(Kit kit) {
+    final kitCost = _kitCosts[kit.id] ?? 0.0;
+
+    return AppCard(
+      onTap: () {
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (context) => ItemListScreen(kit: kit),
+              ),
+            )
+            .then((_) => _refreshKits());
+      },
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(kit.name),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Created: ${DateFormatter.format(kit.dateCreated)}'),
+                Text(
+                  'Total Cost: \$${kitCost.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ],
+            ),
+            leading: StatusBadge(isOpen: kit.isOpen),
+            trailing: ActionButtons(
+              actions: [
+                ActionButton(
+                  icon: Icons.edit,
+                  onPressed: () => _showEditKitDialog(kit),
+                  tooltip: 'Edit Kit',
+                ),
+                ActionButton(
+                  icon: kit.isOpen ? Icons.lock : Icons.lock_open,
+                  onPressed: () => _toggleKitStatus(kit),
+                  color: kit.isOpen
+                      ? AppColors.closedStatus
+                      : AppColors.openStatus,
+                  tooltip:
+                      kit.isOpen ? AppStrings.closeKit : AppStrings.reopenKit,
+                ),
+                ActionButton(
+                  icon: Icons.delete,
+                  onPressed: () => _deleteKit(kit),
+                  color: Colors.grey,
+                  tooltip: AppStrings.delete,
+                ),
+              ],
+            ),
+          ),
+          if (kitCost > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Total Cost: \$${kitCost.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
