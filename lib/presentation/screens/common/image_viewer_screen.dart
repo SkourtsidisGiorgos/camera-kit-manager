@@ -1,11 +1,11 @@
 // lib/presentation/screens/common/image_viewer_screen.dart
 
 import 'dart:io';
+import 'package:camera_kit_manager/domain/entities/item_photo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
-import '../../../domain/entities/rental_item.dart';
 
 class ImageViewerScreen extends StatefulWidget {
   final List<ItemPhoto> photos;

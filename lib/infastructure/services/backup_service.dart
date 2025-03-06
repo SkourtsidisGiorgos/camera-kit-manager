@@ -177,9 +177,7 @@ class BackupService {
     }
 
     final zipData = ZipEncoder().encode(archive);
-    if (zipData != null) {
-      await File(zipFilePath).writeAsBytes(zipData);
-    }
+    await File(zipFilePath).writeAsBytes(zipData);
   }
 
   // Restore from backup

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:camera_kit_manager/domain/entities/item_photo.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -103,7 +104,7 @@ class ImageHelper {
 
   // Delete a photo from an item
   Future<void> deletePhoto(RentalItem item, ItemPhoto photo) async {
-    final updatedPhotos = item.photos.where((p) => p.id != photo.id).toList();
+    final updatedPhotos = item.photos.where((p) => p?.id != photo.id).toList();
     await _updateItemWithPhotos(item, updatedPhotos);
 
     // Delete the actual file

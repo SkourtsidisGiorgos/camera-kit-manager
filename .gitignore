@@ -167,7 +167,6 @@ app.*.symbols
 app.*.map.json
 
 
+android/app/google-services.json
 /.firebase
-
-
 android/app/src/main/AndroidManifest.xml

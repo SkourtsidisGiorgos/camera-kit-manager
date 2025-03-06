@@ -19,6 +19,7 @@ void main() async {
   Hive.registerAdapter(RentalItemAdapter());
   Hive.registerAdapter(EquipmentCategoryAdapter());
   Hive.registerAdapter(RentalAdapter());
+  Hive.registerAdapter(ItemPhotoAdapter());
 
   await Hive.openBox<Kit>('kits');
   await Hive.openBox<RentalItem>('rentalItems');

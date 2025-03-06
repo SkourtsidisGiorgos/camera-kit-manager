@@ -49,7 +49,7 @@
      ```
    - In Xcode, go to Runner > Signing & Capabilities
    - Sign in with your Apple Developer account
-   - Choose your team and set up bundle identifier (e.g., com.yourname.camerakitmanager)
+   - Choose your team and set up bundle identifier (e.g., com.yourname.camera_kit_manager)
 
 4. **Create build archive**
    - Make sure your app version and build number are set in `pubspec.yaml`

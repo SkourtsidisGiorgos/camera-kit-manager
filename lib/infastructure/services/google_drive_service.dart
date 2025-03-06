@@ -1,20 +1,21 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:http/io_client.dart';
 import '../../core/utils/constants.dart';
-import 'backup_service.dart';
 
 class GoogleDriveService {
+  // Add additional scopes and configure properly
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       'email',
+      'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/drive.file',
     ],
+    // Ensuring the client properly identifies on Android
+    signInOption: SignInOption.standard,
   );
 
   // Singleton pattern
@@ -27,17 +28,29 @@ class GoogleDriveService {
   String get userName => _currentUser?.displayName ?? '';
   String get userEmail => _currentUser?.email ?? '';
 
-  // Sign in to Google
+  // Sign in to Google with improved error handling
   Future<bool> signIn() async {
     try {
+      // Force a fresh sign-in flow by signing out first
+      await _googleSignIn.signOut();
+
+      // Begin interactive sign-in process
       final account = await _googleSignIn.signIn();
       if (account == null) {
+        debugPrint('Sign-in cancelled by user');
         return false;
       }
+
       _currentUser = account;
+      debugPrint('Successfully signed in as: ${account.email}');
       return true;
-    } catch (error) {
-      debugPrint('Error signing in: $error');
+    } on Exception catch (error) {
+      debugPrint('Error signing in: ${error.runtimeType} - $error');
+
+      if (error.toString().contains('ApiException: 10')) {
+        debugPrint('OAuth client configuration issue. Check Firebase console.');
+      }
+
       return false;
     }
   }
@@ -47,6 +60,7 @@ class GoogleDriveService {
     try {
       await _googleSignIn.signOut();
       _currentUser = null;
+      debugPrint('Successfully signed out');
     } catch (error) {
       debugPrint('Error signing out: $error');
     }
@@ -58,9 +72,23 @@ class GoogleDriveService {
       throw Exception('User not signed in to Google');
     }
 
-    final authHeaders = await _currentUser!.authHeaders;
-    final httpClient = http.Client();
-    return _AuthClient(httpClient, authHeaders);
+    try {
+      // Ensure fresh tokens
+      await _currentUser!.clearAuthCache();
+      final authHeaders = await _currentUser!.authHeaders;
+      final httpClient = http.Client();
+      return _AuthClient(httpClient, authHeaders);
+    } catch (e) {
+      debugPrint('Error getting auth headers: $e');
+      // Attempt to refresh authentication
+      await signIn();
+      if (_currentUser == null) {
+        throw Exception('Failed to refresh authentication');
+      }
+      final authHeaders = await _currentUser!.authHeaders;
+      final httpClient = http.Client();
+      return _AuthClient(httpClient, authHeaders);
+    }
   }
 
   // Upload backup file to Google Drive
@@ -73,9 +101,7 @@ class GoogleDriveService {
       final folderName = AppStrings.appTitle;
       String? folderId = await _getFolderIdByName(driveApi, folderName);
 
-      if (folderId == null) {
-        folderId = await _createFolder(driveApi, folderName);
-      }
+      folderId ??= await _createFolder(driveApi, folderName);
 
       // Prepare file metadata
       final fileMetadata = drive.File(
@@ -86,7 +112,6 @@ class GoogleDriveService {
         mimeType: 'application/octet-stream',
       );
 
-      // Upload file content
       final media = drive.Media(
         file.openRead(),
         await file.length(),
@@ -104,7 +129,6 @@ class GoogleDriveService {
     }
   }
 
-  // Download backup file from Google Drive
   Future<File?> downloadBackup(String fileId) async {
     try {
       final client = await _getHttpClient();
@@ -114,13 +138,11 @@ class GoogleDriveService {
       final file = await driveApi.files.get(fileId) as drive.File;
       final fileName = file.name ?? 'backup.json';
 
-      // Get file content
       drive.Media media = await driveApi.files.get(
         fileId,
         downloadOptions: drive.DownloadOptions.fullMedia,
       ) as drive.Media;
 
-      // Save to temp file
       final directory = await getTemporaryDirectory();
       final localFile = File('${directory.path}/$fileName');
 

@@ -110,13 +110,13 @@ class PhotoContainer extends StatelessWidget {
   final VoidCallback? onTap;
 
   const PhotoContainer({
-    Key? key,
+    super.key,
     this.imagePath,
     this.imageDataUrl,
     this.height = 200,
     this.fit = BoxFit.cover,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

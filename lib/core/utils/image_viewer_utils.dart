@@ -1,5 +1,6 @@
 // lib/core/utils/image_viewer_utils.dart
 
+import 'package:camera_kit_manager/domain/entities/item_photo.dart';
 import 'package:flutter/material.dart';
 import '../../domain/entities/rental_item.dart';
 import '../../presentation/screens/common/image_viewer_screen.dart';

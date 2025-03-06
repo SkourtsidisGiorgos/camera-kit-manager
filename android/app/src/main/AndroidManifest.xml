@@ -37,8 +37,8 @@ package="com.viterby.camera_kit_manager">
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
 
-        <meta-data
+        <!-- <meta-data
             android:name="com.google.android.gms.auth.api.signin.WebClientId"
-            android:value="@string/default_web_client_id" />
+            android:value="@string/default_web_client_id" /> -->
     </application>
 </manifest>

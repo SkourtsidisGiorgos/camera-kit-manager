@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlin_version = '1.8.10'  // Update Kotlin
+    ext.kotlin_version = '2.1.10'  // Update Kotlin
     dependencies {
         classpath 'com.android.tools.build:gradle:8.1.0'  // Update AGP
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
