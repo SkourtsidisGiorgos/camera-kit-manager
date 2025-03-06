@@ -192,8 +192,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
           }
         });
 
-        // Auto-save after adding a photo
-        _saveItem();
+        // Instead of calling _saveItem directly, call _onFieldChanged
+        // This will run the debouncer and prevent multiple rapid saves
+        // when adding multiple photos
+        _onFieldChanged();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -303,9 +305,10 @@ class _AddItemScreenState extends State<AddItemScreen> {
         }
       }
 
-      // Create the item
+      // Create or update the item
       final item = RentalItem(
-        id: widget.existingItem?.id,
+        id: _currentItem?.id ??
+            widget.existingItem?.id, // Use existing item ID if available
         kitId: widget.kitId,
         name: _itemNameController.text,
         dateAdded: widget.existingItem?.dateAdded ?? DateTime.now(),
@@ -318,7 +321,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
       );
 
       await _itemRepository.saveRentalItem(item);
-      _currentItem = item;
+      _currentItem = item; // Keep track of the current item to avoid duplicates
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving: ${e.toString()}')),
@@ -658,11 +661,18 @@ class _AddItemScreenState extends State<AddItemScreen> {
 class Debouncer {
   final int milliseconds;
   Timer? _timer;
+  bool _running = false;
 
   Debouncer({required this.milliseconds});
 
   run(VoidCallback action) {
+    if (_running) return;
+
+    _running = true;
     _timer?.cancel();
-    _timer = Timer(Duration(milliseconds: milliseconds), action);
+    _timer = Timer(Duration(milliseconds: milliseconds), () {
+      action();
+      _running = false;
+    });
   }
 }

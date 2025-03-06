@@ -1,5 +1,7 @@
+import 'package:camera_kit_manager/core/services/theme_provider_service.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/utils/constants.dart';
 import 'backup_settings_screen.dart';
@@ -12,7 +14,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = false;
   bool _autoBackup = false;
   String _appVersion = '';
   bool _isLoading = true;
@@ -27,16 +28,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _darkMode = prefs.getBool('darkMode') ?? false;
       _autoBackup = prefs.getBool('autoBackup') ?? false;
       _isLoading = false;
     });
   }
 
-  Future<void> _saveSettings() async {
+  Future<void> _saveAutoBackupSetting(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('darkMode', _darkMode);
-    await prefs.setBool('autoBackup', _autoBackup);
+    await prefs.setBool('autoBackup', value);
+    setState(() {
+      _autoBackup = value;
+    });
   }
 
   Future<void> _getAppVersion() async {
@@ -57,6 +59,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -79,18 +83,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 SwitchListTile(
                   title: const Text('Dark Mode'),
                   subtitle: const Text('Use dark theme throughout the app'),
-                  value: _darkMode,
+                  value: themeProvider.isDarkMode,
                   onChanged: (value) {
-                    setState(() {
-                      _darkMode = value;
-                      _saveSettings();
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content:
-                            Text('App restart required to apply theme changes'),
-                      ),
-                    );
+                    themeProvider.setDarkMode(value);
                   },
                 ),
                 const Divider(),
@@ -111,10 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text('Automatically backup data weekly'),
                   value: _autoBackup,
                   onChanged: (value) {
-                    setState(() {
-                      _autoBackup = value;
-                      _saveSettings();
-                    });
+                    _saveAutoBackupSetting(value);
                   },
                 ),
                 ListTile(
