@@ -1,0 +1,1 @@
+/home/gskourts/opt/projects/flutter/camera_kit_manager/build/app/intermediates/cxx/RelWithDebInfo/b5t241q3/obj/arm64-v8a

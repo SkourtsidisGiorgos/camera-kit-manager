@@ -1,0 +1,2 @@
+/home/gskourts/opt/projects/flutter/camera_kit_manager/android/app/.cxx/RelWithDebInfo/b5t241q3/armeabi-v7a/CMakeFiles/edit_cache.dir
+/home/gskourts/opt/projects/flutter/camera_kit_manager/android/app/.cxx/RelWithDebInfo/b5t241q3/armeabi-v7a/CMakeFiles/rebuild_cache.dir
