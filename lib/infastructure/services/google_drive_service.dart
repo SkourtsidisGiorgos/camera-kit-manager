@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:camera_kit_manager/core/utils/file_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
@@ -94,6 +95,7 @@ class GoogleDriveService {
   // Upload backup file to Google Drive
   Future<String?> uploadBackup(File file, String fileName) async {
     try {
+      debugPrint('Uploading backup to Google Drive: ${file.path}');
       final client = await _getHttpClient();
       final driveApi = drive.DriveApi(client);
 
@@ -103,18 +105,27 @@ class GoogleDriveService {
 
       folderId ??= await _createFolder(driveApi, folderName);
 
+      if (folderId == null) {
+        throw Exception('Failed to create or find app folder in Google Drive');
+      }
+
       // Prepare file metadata
       final fileMetadata = drive.File(
         name: fileName,
-        parents: [folderId!],
+        parents: [folderId],
         description:
             'Camera Kit Manager Backup - ${DateTime.now().toIso8601String()}',
-        mimeType: 'application/octet-stream',
+        mimeType:
+            file.path.endsWith('.zip') ? 'application/zip' : 'application/json',
       );
+
+      final fileLength = await file.length();
+      debugPrint(
+          'Uploading file of size: ${FileUtils.formatFileSize(fileLength)}');
 
       final media = drive.Media(
         file.openRead(),
-        await file.length(),
+        fileLength,
       );
 
       final driveFile = await driveApi.files.create(
@@ -122,6 +133,7 @@ class GoogleDriveService {
         uploadMedia: media,
       );
 
+      debugPrint('File uploaded to Google Drive with ID: ${driveFile.id}');
       return driveFile.id;
     } catch (e) {
       debugPrint('Error uploading to Google Drive: $e');
@@ -131,13 +143,20 @@ class GoogleDriveService {
 
   Future<File?> downloadBackup(String fileId) async {
     try {
+      debugPrint('Downloading backup from Google Drive, ID: $fileId');
       final client = await _getHttpClient();
       final driveApi = drive.DriveApi(client);
 
       // Get file metadata
       final file = await driveApi.files.get(fileId) as drive.File;
-      final fileName = file.name ?? 'backup.json';
+      if (file.name == null) {
+        throw Exception('File name is null');
+      }
 
+      final fileName = file.name!;
+      debugPrint('Downloading file: $fileName');
+
+      // Create media object for download
       drive.Media media = await driveApi.files.get(
         fileId,
         downloadOptions: drive.DownloadOptions.fullMedia,
@@ -146,11 +165,16 @@ class GoogleDriveService {
       final directory = await getTemporaryDirectory();
       final localFile = File('${directory.path}/$fileName');
 
+      // Stream data to file
       List<int> dataStore = [];
       await for (var data in media.stream) {
         dataStore.addAll(data);
       }
       await localFile.writeAsBytes(dataStore);
+
+      debugPrint('File downloaded to: ${localFile.path}');
+      debugPrint(
+          'File size: ${FileUtils.formatFileSize(await localFile.length())}');
 
       return localFile;
     } catch (e) {
@@ -162,6 +186,7 @@ class GoogleDriveService {
   // Get list of backup files from Google Drive
   Future<List<drive.File>> getBackupFiles() async {
     try {
+      debugPrint('Fetching backup files from Google Drive');
       final client = await _getHttpClient();
       final driveApi = drive.DriveApi(client);
 
@@ -170,6 +195,7 @@ class GoogleDriveService {
       String? folderId = await _getFolderIdByName(driveApi, folderName);
 
       if (folderId == null) {
+        debugPrint('App folder not found in Google Drive');
         return [];
       }
 
@@ -180,12 +206,15 @@ class GoogleDriveService {
         $fields: 'files(id, name, modifiedTime, size)',
       );
 
-      return fileList.files
+      final files = fileList.files
               ?.where((file) =>
                   file.name?.endsWith('.json') == true ||
                   file.name?.endsWith('.zip') == true)
               .toList() ??
           [];
+
+      debugPrint('Found ${files.length} backup files');
+      return files;
     } catch (e) {
       debugPrint('Error fetching backup files: $e');
       return [];
@@ -202,8 +231,11 @@ class GoogleDriveService {
       );
 
       if (result.files != null && result.files!.isNotEmpty) {
+        debugPrint(
+            'Found existing app folder in Google Drive: ${result.files!.first.id}');
         return result.files!.first.id;
       }
+      debugPrint('App folder not found in Google Drive');
       return null;
     } catch (e) {
       debugPrint('Error finding folder: $e');
@@ -215,12 +247,14 @@ class GoogleDriveService {
   Future<String?> _createFolder(
       drive.DriveApi driveApi, String folderName) async {
     try {
+      debugPrint('Creating app folder in Google Drive: $folderName');
       final folder = drive.File(
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder',
       );
 
       final result = await driveApi.files.create(folder);
+      debugPrint('Created folder with ID: ${result.id}');
       return result.id;
     } catch (e) {
       debugPrint('Error creating folder: $e');
@@ -231,10 +265,12 @@ class GoogleDriveService {
   // Delete a file from Google Drive
   Future<bool> deleteFile(String fileId) async {
     try {
+      debugPrint('Deleting file from Google Drive, ID: $fileId');
       final client = await _getHttpClient();
       final driveApi = drive.DriveApi(client);
 
       await driveApi.files.delete(fileId);
+      debugPrint('File deleted successfully');
       return true;
     } catch (e) {
       debugPrint('Error deleting file: $e');

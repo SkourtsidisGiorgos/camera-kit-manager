@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'package:camera_kit_manager/core/utils/file_utils.dart';
+import 'package:camera_kit_manager/core/utils/message_utils.dart';
+import 'package:camera_kit_manager/infastructure/services/import_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:googleapis/drive/v3.dart' as drive;
@@ -17,6 +20,7 @@ class BackupSettingsScreen extends StatefulWidget {
 
 class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
   final _backupService = BackupService();
+  final _importService = ImportService();
   final _driveService = GoogleDriveService();
 
   bool _isLoading = false;
@@ -106,7 +110,13 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     await _performOperation(() async {
       final backupFile =
           await _backupService.createBackup(includeImages: _includeImages);
-      _showSuccess('Backup created successfully');
+
+      // Show specific message about what type of backup was created
+      if (_includeImages && !kIsWeb) {
+        _showSuccess('Full backup with images created successfully');
+      } else {
+        _showSuccess('Backup created successfully (without images)');
+      }
 
       // Show options dialog
       if (!mounted) return;
@@ -119,7 +129,27 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Backup Created'),
-        content: const Text('What would you like to do with this backup?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('What would you like to do with this backup?'),
+            const SizedBox(height: 8),
+            // Show file details
+            Text(
+              'File: ${backupFile.path.split('/').last}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            Text(
+              'Size: ${FileUtils.formatFileSize(backupFile.lengthSync())}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            Text(
+              'Images included: ${_includeImages && !kIsWeb ? 'Yes' : 'No'}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -176,21 +206,47 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     await _performOperation(() async {
       // Show warning dialog
       if (!mounted) return;
-      final proceedWithImport = await _showImportWarningDialog();
+      final proceedWithImport = await MessageUtils.showImportWarningDialog(
+          context,
+          'Importing a backup will REPLACE ALL CURRENT DATA. This cannot be undone.\n\nDo you want to continue?',
+          'Import & Replace Data');
       if (!proceedWithImport) {
         setState(() => _isLoading = false);
         return;
       }
 
-      final backupFile = await _backupService.pickBackupFile();
+      final backupFile = await _importService.pickBackupFile();
       if (backupFile == null) {
         _showError('No backup file selected');
         return;
       }
 
-      final success = await _backupService.restoreFromBackup(backupFile);
+      // Show import status with file details
+      setState(() {
+        _successMessage = null;
+        _errorMessage = null;
+        _isLoading = true;
+      });
+
+      final isZip = backupFile.path.endsWith('.zip');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Importing ${isZip ? 'full backup with images' : 'backup'}...'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      final success = await _importService.restoreFromBackup(backupFile);
       if (success) {
         _showSuccess('Backup restored successfully');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Backup restored successfully. Please restart the app to see all changes.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
       } else {
         _showError('Failed to restore backup');
       }
@@ -201,7 +257,10 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     await _performOperation(() async {
       // Show warning dialog
       if (!mounted) return;
-      final proceedWithImport = await _showImportWarningDialog();
+      final proceedWithImport = await MessageUtils.showImportWarningDialog(
+          context,
+          'Importing a backup will REPLACE ALL CURRENT DATA. This cannot be undone.\n\nDo you want to continue?',
+          'Import & Replace Data');
       if (!proceedWithImport) {
         setState(() => _isLoading = false);
         return;
@@ -213,9 +272,32 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         return;
       }
 
-      final success = await _backupService.restoreFromBackup(localFile);
+      // Show import status with file details
+      setState(() {
+        _successMessage = null;
+        _errorMessage = null;
+        _isLoading = true;
+      });
+
+      final isZip = localFile.path.endsWith('.zip');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Importing ${isZip ? 'full backup with images' : 'backup'}...'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      final success = await _importService.restoreFromBackup(localFile);
       if (success) {
         _showSuccess('Backup restored successfully');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Backup restored successfully. Please restart the app to see all changes.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
       } else {
         _showError('Failed to restore backup');
       }
@@ -243,32 +325,6 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         _showError('Failed to delete backup');
       }
     }, 'Failed to delete from Google Drive');
-  }
-
-  Future<bool> _showImportWarningDialog() async {
-    return await ConfirmationDialog.show(
-      context: context,
-      title: 'Warning',
-      message:
-          'Importing a backup will REPLACE ALL CURRENT DATA. This cannot be undone.\n\nDo you want to continue?',
-      confirmText: 'Import & Replace Data',
-      isDangerous: true,
-    );
-  }
-
-  String _formatFileSize(int? bytes) {
-    if (bytes == null) return 'Unknown size';
-
-    const suffixes = ['B', 'KB', 'MB', 'GB'];
-    var i = 0;
-    double size = bytes.toDouble();
-
-    while (size >= 1024 && i < suffixes.length - 1) {
-      size /= 1024;
-      i++;
-    }
-
-    return '${size.toStringAsFixed(1)} ${suffixes[i]}';
   }
 
   @override
@@ -499,7 +555,8 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         final modifiedTime = file.modifiedTime != null
             ? DateFormat('MMM d, yyyy h:mm a').format(file.modifiedTime!)
             : 'Unknown date';
-        final fileSize = _formatFileSize(int.tryParse(file.size ?? '0'));
+        final fileSize =
+            FileUtils.formatFileSize(int.tryParse(file.size ?? '0'));
 
         return ListTile(
           title: Text(fileName),

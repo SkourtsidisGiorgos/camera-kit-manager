@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../domain/entities/kit.dart';
 import '../../domain/entities/rental_item.dart';
@@ -28,17 +27,21 @@ class BackupService {
         final jsonFile = File(
             '${directory.path}/camera_kit_backup_${DateTime.now().millisecondsSinceEpoch}.json');
         await jsonFile.writeAsString(jsonEncode(backupData));
+        debugPrint('Web backup created at: ${jsonFile.path}');
         return jsonFile;
       }
 
       // For mobile, we support full backups with images
       if (includeImages) {
-        return await _createFullBackup(backupData);
+        final zipFile = await _createFullBackup(backupData);
+        debugPrint('Full backup with images created at: ${zipFile.path}');
+        return zipFile;
       } else {
         final directory = await getApplicationDocumentsDirectory();
         final jsonFile = File(
             '${directory.path}/camera_kit_backup_${DateTime.now().millisecondsSinceEpoch}.json');
         await jsonFile.writeAsString(jsonEncode(backupData));
+        debugPrint('JSON-only backup created at: ${jsonFile.path}');
         return jsonFile;
       }
     } catch (e) {
@@ -50,6 +53,7 @@ class BackupService {
   // Create a full backup including images
   Future<File> _createFullBackup(Map<String, dynamic> backupData) async {
     try {
+      debugPrint('Starting full backup creation with images...');
       final directory = await getApplicationDocumentsDirectory();
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -60,17 +64,24 @@ class BackupService {
         backupDir.createSync();
       }
 
+      debugPrint('Created backup directory: ${backupDir.path}');
+
       // Save JSON data
       final jsonFile = File('${backupDir.path}/data.json');
       await jsonFile.writeAsString(jsonEncode(backupData));
+      debugPrint('JSON data saved to: ${jsonFile.path}');
 
       // Copy all referenced images
       final imagesDir = Directory('${backupDir.path}/images');
       if (!imagesDir.existsSync()) {
         imagesDir.createSync();
       }
+      debugPrint('Images directory created: ${imagesDir.path}');
 
-      await _copyItemImages(backupData, imagesDir);
+      // Copy item images and photos
+      await _copyItemImagesAndPhotos(backupData, imagesDir);
+
+      // Copy rental images
       await _copyRentalImages(backupData, imagesDir);
 
       // Create zip archive
@@ -78,9 +89,12 @@ class BackupService {
           File('${directory.path}/camera_kit_backup_$timestamp.zip');
       await _createZipFromDirectory(backupDir.path, zipFile.path);
 
+      debugPrint('Zip file created at: ${zipFile.path}');
+
       // Clean up temp directory
       if (backupDir.existsSync()) {
         await backupDir.delete(recursive: true);
+        debugPrint('Cleaned up temporary backup directory');
       }
 
       return zipFile;
@@ -90,29 +104,65 @@ class BackupService {
     }
   }
 
-  // Copy item images to backup folder
-  Future<void> _copyItemImages(
+  // Copy both legacy item images and new photo collections
+  Future<void> _copyItemImagesAndPhotos(
       Map<String, dynamic> backupData, Directory imagesDir) async {
     final items = backupData['rentalItems'] as List;
+    int copiedImages = 0;
+
     for (var item in items) {
+      // Handle legacy image path
       if (item['imagePath'] != null && item['imagePath'].isNotEmpty) {
         final File imageFile = File(item['imagePath']);
         if (await imageFile.exists()) {
           final fileName = imageFile.path.split('/').last;
           final newPath = '${imagesDir.path}/$fileName';
           await imageFile.copy(newPath);
+          copiedImages++;
 
           // Update path in backup data to be relative
           item['imagePath'] = 'images/$fileName';
+        } else {
+          debugPrint('Image file not found: ${item['imagePath']}');
+          // Set to null if file doesn't exist to avoid restore errors
+          item['imagePath'] = null;
+        }
+      }
+
+      // Handle item photos collection
+      if (item.containsKey('photos') && item['photos'] is List) {
+        final photos = item['photos'] as List;
+        for (int i = 0; i < photos.length; i++) {
+          final photo = photos[i];
+          if (photo['imagePath'] != null && photo['imagePath'].isNotEmpty) {
+            final File photoFile = File(photo['imagePath']);
+            if (await photoFile.exists()) {
+              final fileName = photoFile.path.split('/').last;
+              final newPath = '${imagesDir.path}/$fileName';
+              await photoFile.copy(newPath);
+              copiedImages++;
+
+              // Update path in backup data to be relative
+              photos[i]['imagePath'] = 'images/$fileName';
+            } else {
+              debugPrint('Photo file not found: ${photo['imagePath']}');
+              // Set to null if file doesn't exist
+              photos[i]['imagePath'] = null;
+            }
+          }
         }
       }
     }
+
+    debugPrint('Copied $copiedImages item images and photos');
   }
 
   // Copy rental images to backup folder
   Future<void> _copyRentalImages(
       Map<String, dynamic> backupData, Directory imagesDir) async {
     final rentals = backupData['rentals'] as List;
+    int copiedImages = 0;
+
     for (var rental in rentals) {
       if (rental['imagePath'] != null && rental['imagePath'].isNotEmpty) {
         final File imageFile = File(rental['imagePath']);
@@ -120,12 +170,19 @@ class BackupService {
           final fileName = imageFile.path.split('/').last;
           final newPath = '${imagesDir.path}/$fileName';
           await imageFile.copy(newPath);
+          copiedImages++;
 
           // Update path in backup data to be relative
           rental['imagePath'] = 'images/$fileName';
+        } else {
+          debugPrint('Rental image not found: ${rental['imagePath']}');
+          // Set to null if file doesn't exist
+          rental['imagePath'] = null;
         }
       }
     }
+
+    debugPrint('Copied $copiedImages rental images');
   }
 
   // Export all data from Hive boxes
@@ -164,6 +221,7 @@ class BackupService {
       String sourceDir, String zipFilePath) async {
     final sourceDirectory = Directory(sourceDir);
     final files = sourceDirectory.listSync(recursive: true);
+    debugPrint('Creating zip from ${files.length} files...');
 
     final archive = Archive();
 
@@ -173,215 +231,19 @@ class BackupService {
         final data = await file.readAsBytes();
         final archiveFile = ArchiveFile(relativePath, data.length, data);
         archive.addFile(archiveFile);
+        debugPrint('Added to archive: $relativePath (${data.length} bytes)');
       }
     }
 
     final zipData = ZipEncoder().encode(archive);
     await File(zipFilePath).writeAsBytes(zipData);
+    debugPrint('Zip archive created successfully');
   }
 
-  // Restore from backup
-  Future<bool> restoreFromBackup(File backupFile) async {
-    try {
-      if (backupFile.path.endsWith('.json')) {
-        final jsonData = await backupFile.readAsString();
-        final backupData = jsonDecode(jsonData) as Map<String, dynamic>;
-        return await _importData(backupData, null);
-      } else if (backupFile.path.endsWith('.zip')) {
-        return await _restoreFromZip(backupFile);
-      } else {
-        throw Exception('Unsupported backup file format');
-      }
-    } catch (e) {
-      debugPrint('Error restoring backup: $e');
-      return false;
-    }
-  }
-
-  // Restore from zip backup
-  Future<bool> _restoreFromZip(File zipFile) async {
-    try {
-      final bytes = await zipFile.readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes);
-
-      final tempDir = await getTemporaryDirectory();
-      final extractDir = Directory(
-          '${tempDir.path}/extract_${DateTime.now().millisecondsSinceEpoch}');
-      if (!extractDir.existsSync()) {
-        extractDir.createSync();
-      }
-
-      // Extract all files
-      for (final file in archive) {
-        final filename = file.name;
-        if (file.isFile) {
-          final outFile = File('${extractDir.path}/$filename');
-          outFile.createSync(recursive: true);
-          outFile.writeAsBytesSync(file.content as List<int>);
-        }
-      }
-
-      // Read JSON data
-      final jsonFile = File('${extractDir.path}/data.json');
-      if (!jsonFile.existsSync()) {
-        throw Exception('Backup is missing data.json file');
-      }
-
-      final jsonData = await jsonFile.readAsString();
-      final backupData = jsonDecode(jsonData) as Map<String, dynamic>;
-
-      // Import data with the extract directory for image references
-      final result = await _importData(backupData, extractDir.path);
-
-      // Clean up
-      if (extractDir.existsSync()) {
-        await extractDir.delete(recursive: true);
-      }
-
-      return result;
-    } catch (e) {
-      debugPrint('Error restoring from zip: $e');
-      return false;
-    }
-  }
-
-  // Import data from backup
-  Future<bool> _importData(
-      Map<String, dynamic> backupData, String? extractDirPath) async {
-    // Clear existing data
-    await Hive.box<Kit>('kits').clear();
-    await Hive.box<RentalItem>('rentalItems').clear();
-    await Hive.box<EquipmentCategory>('equipmentCategories').clear();
-    await Hive.box<Rental>('rentals').clear();
-
-    // Get app document directory for saving images
-    final appDir = await getApplicationDocumentsDirectory();
-
-    // Restore equipment categories
-    if (backupData.containsKey('equipmentCategories')) {
-      final categoriesBox = Hive.box<EquipmentCategory>('equipmentCategories');
-      final categories = backupData['equipmentCategories'] as List;
-
-      for (var categoryData in categories) {
-        final category = EquipmentCategory(
-          id: categoryData['id'],
-          name: categoryData['name'],
-          predefinedItems: List<String>.from(categoryData['predefinedItems']),
-        );
-        await categoriesBox.put(category.id, category);
-      }
-    }
-
-    // Restore kits
-    if (backupData.containsKey('kits')) {
-      final kitsBox = Hive.box<Kit>('kits');
-      final kits = backupData['kits'] as List;
-
-      for (var kitData in kits) {
-        final kit = Kit(
-          id: kitData['id'],
-          name: kitData['name'],
-          dateCreated: DateTime.parse(kitData['dateCreated']),
-          isOpen: kitData['isOpen'],
-        );
-        await kitsBox.put(kit.id, kit);
-      }
-    }
-
-    // Restore rental items
-    if (backupData.containsKey('rentalItems')) {
-      final itemsBox = Hive.box<RentalItem>('rentalItems');
-      final items = backupData['rentalItems'] as List;
-
-      for (var itemData in items) {
-        String? imagePath = itemData['imagePath'];
-
-        // Handle image paths
-        if (imagePath != null &&
-            imagePath.startsWith('images/') &&
-            extractDirPath != null) {
-          final sourceFile = File('$extractDirPath/$imagePath');
-          if (await sourceFile.exists()) {
-            final fileName = sourceFile.path.split('/').last;
-            final destPath = '${appDir.path}/$fileName';
-            await sourceFile.copy(destPath);
-            imagePath = destPath;
-          } else {
-            imagePath = null;
-          }
-        }
-
-        final item = RentalItem(
-          id: itemData['id'],
-          kitId: itemData['kitId'],
-          name: itemData['name'],
-          dateAdded: DateTime.parse(itemData['dateAdded']),
-          imagePath: imagePath,
-          imageDataUrl: itemData['imageDataUrl'],
-          category: itemData['category'],
-          notes: itemData['notes'],
-          cost: itemData['cost']?.toDouble(),
-        );
-        await itemsBox.put(item.id, item);
-      }
-    }
-
-    // Restore rentals
-    if (backupData.containsKey('rentals')) {
-      final rentalsBox = Hive.box<Rental>('rentals');
-      final rentals = backupData['rentals'] as List;
-
-      for (var rentalData in rentals) {
-        String? imagePath = rentalData['imagePath'];
-
-        // Handle image paths
-        if (imagePath != null &&
-            imagePath.startsWith('images/') &&
-            extractDirPath != null) {
-          final sourceFile = File('$extractDirPath/$imagePath');
-          if (await sourceFile.exists()) {
-            final fileName = sourceFile.path.split('/').last;
-            final destPath = '${appDir.path}/$fileName';
-            await sourceFile.copy(destPath);
-            imagePath = destPath;
-          } else {
-            imagePath = null;
-          }
-        }
-
-        DateTime? endDate;
-        if (rentalData['endDate'] != null) {
-          endDate = DateTime.parse(rentalData['endDate']);
-        }
-
-        final kitIds = rentalData['kitIds'] != null
-            ? List<String>.from(rentalData['kitIds'])
-            : <String>[];
-
-        final rental = Rental(
-          id: rentalData['id'],
-          name: rentalData['name'],
-          startDate: DateTime.parse(rentalData['startDate']),
-          endDate: endDate,
-          address: rentalData['address'],
-          latitude: rentalData['latitude'],
-          longitude: rentalData['longitude'],
-          imagePath: imagePath,
-          imageDataUrl: rentalData['imageDataUrl'],
-          notes: rentalData['notes'],
-          kitIds: kitIds,
-        );
-        await rentalsBox.put(rental.id, rental);
-      }
-    }
-
-    return true;
-  }
-
-  // Export backup to share
   Future<void> shareBackup({bool includeImages = true}) async {
     try {
       final backupFile = await createBackup(includeImages: includeImages);
+      debugPrint('Sharing backup: ${backupFile.path}');
       await Share.shareXFiles(
         [XFile(backupFile.path)],
         subject: 'Camera Kit Manager Backup',
@@ -390,24 +252,6 @@ class BackupService {
     } catch (e) {
       debugPrint('Error sharing backup: $e');
       rethrow;
-    }
-  }
-
-  // Import backup from file
-  Future<File?> pickBackupFile() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json', 'zip'],
-      );
-
-      if (result != null && result.files.single.path != null) {
-        return File(result.files.single.path!);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error picking backup file: $e');
-      return null;
     }
   }
 }
