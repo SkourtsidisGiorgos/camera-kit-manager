@@ -1,4 +1,4 @@
-# Camera Kit Manager - App Summary
+# Camera Kit Manager
 
 ## Overview
 The Camera Kit Manager is a Flutter application designed for camera assistants to manage equipment rentals efficiently. It allows users to track rental kits, add equipment items with photos, and share rental details.
